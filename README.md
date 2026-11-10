@@ -36,7 +36,7 @@ Authorization is row-level security: private cards are owner-only; group cards a
 
 ## What was verified
 
-- `npm test`: 45 tests — recurrence/DST/timezone, no duplicate instances (concurrent loads), skip, progress rules (notes-only never complete, clamp at 100%), historical isolation, shared vs individual completion, independent personal ordering/hiding, stale-edit detection, invitations, and **the real SQL migration run in an in-process Postgres (PGlite) with RLS exercised as owner/editor/viewer/outsider/anonymous**.
+- `npm test`: 50 tests — recurrence/DST/timezone, no duplicate instances (concurrent loads), skip, progress rules (notes-only never complete, clamp at 100%), historical isolation, shared vs individual completion, independent personal ordering/hiding, stale-edit detection, invitations, and **the real SQL migration run in an in-process Postgres (PGlite) with RLS exercised as owner/editor/viewer/outsider/anonymous**.
 - Manually in a browser: phone-width (390px) and desktop layouts, complete / flip / add / persistence after reload, single card face in the DOM with focus moved to the new control.
 
 ## Limitations / not done

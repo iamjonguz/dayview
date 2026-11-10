@@ -9,12 +9,16 @@ export type EditorTarget =
 
 interface UiState {
   editor: EditorTarget;
+  searchOpen: boolean;
+  setSearchOpen(o: boolean): void;
   openCreate(date: DateStr, opts?: { sectionId?: ID | null; templateId?: ID }): void;
   openEdit(instanceId: ID): void;
   closeEditor(): void;
 }
 export const useUi = create<UiState>((set) => ({
   editor: null,
+  searchOpen: false,
+  setSearchOpen: (searchOpen) => set({ searchOpen }),
   openCreate: (date, opts) => set({ editor: { kind: "create", date, ...opts } }),
   openEdit: (instanceId) => set({ editor: { kind: "edit", instanceId } }),
   closeEditor: () => set({ editor: null }),

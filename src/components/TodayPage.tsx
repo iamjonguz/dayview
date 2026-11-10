@@ -1,7 +1,7 @@
 "use client";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import clsx from "clsx";
-import { CalendarDays, ChevronLeft, ChevronRight, EyeOff, LayoutTemplate, ListOrdered, MoreHorizontal, Plus, Rows3, Settings, Sun, Sunrise, Moon, Star, FastForward } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, EyeOff, LayoutTemplate, ListOrdered, MoreHorizontal, Plus, Search, Rows3, Settings, Sun, Sunrise, Moon, Star, FastForward } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { DayCard } from "@/lib/domain/dayview";
@@ -13,6 +13,7 @@ import { ActivityCard, type MoveRequest } from "./ActivityCard";
 import { ArrangeView } from "./ArrangeView";
 import { ProgressBar } from "./bits";
 import { DeleteCardDialog } from "./CardEditor";
+import { CarryOver, RescheduleSheet } from "./FindAndCarry";
 import { ApplyLayoutSheet, DatePickerSheet, SaveLayoutSheet, SectionsSheet } from "./DayDialogs";
 import { Button, IconButton, Spinner } from "./ui";
 
@@ -33,6 +34,8 @@ export function TodayPage() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [arrange, setArrange] = useState(false);
   const [deleting, setDeleting] = useState<DayCard | null>(null);
+  const [resched, setResched] = useState<{ card: DayCard; mode: "move" | "copy" } | null>(null);
+  const setSearchOpen = useUi((s) => s.setSearchOpen);
 
   if (!ws || !planner) return null;
   const today = planner.today();
@@ -80,7 +83,7 @@ export function TodayPage() {
             <IconButton label="Choose a date" onClick={() => setPickerOpen(true)}><CalendarDays size={20} /></IconButton>
             <Menu.Root>
               <span className="hidden sm:block"><Menu.Trigger asChild><IconButton label="More day options"><MoreHorizontal size={20} /></IconButton></Menu.Trigger></span>
-              <DayMenu onArrange={() => setArrange(true)} onSections={() => setSectionsOpen(true)} onApply={() => setApplyOpen(true)} onSave={() => setSaveOpen(true)} />
+              <DayMenu onSearch={() => setSearchOpen(true)} onArrange={() => setArrange(true)} onSections={() => setSectionsOpen(true)} onApply={() => setApplyOpen(true)} onSave={() => setSaveOpen(true)} />
             </Menu.Root>
             <span className="hidden md:block"><Button variant="primary" onClick={() => openCreate(date)}><Plus size={18} aria-hidden /> Add card</Button></span>
             <span className="md:hidden"><IconButton label="Add card" variant="outline" onClick={() => openCreate(date)}><Plus size={22} /></IconButton></span>
@@ -93,10 +96,12 @@ export function TodayPage() {
           <ProgressBar fraction={summary && summary.total ? summary.done / summary.total : 0} label="Day progress" className="flex-1" />
           <Menu.Root>
             <span className="sm:hidden"><Menu.Trigger asChild><IconButton label="More day options" bare className="size-9 text-muted"><MoreHorizontal size={20} /></IconButton></Menu.Trigger></span>
-            <DayMenu onArrange={() => setArrange(true)} onSections={() => setSectionsOpen(true)} onApply={() => setApplyOpen(true)} onSave={() => setSaveOpen(true)} />
+            <DayMenu onSearch={() => setSearchOpen(true)} onArrange={() => setArrange(true)} onSections={() => setSectionsOpen(true)} onApply={() => setApplyOpen(true)} onSave={() => setSaveOpen(true)} />
           </Menu.Root>
         </div>
       </header>
+
+      <CarryOver />
 
       {arrange && (
         <div className="mb-4 flex items-center justify-between rounded-2xl border border-amber/40 bg-amber/10 px-4 py-2">
@@ -137,7 +142,7 @@ export function TodayPage() {
                   <ul className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {g.cards.map((c, i) => (
                       <li key={c.instance.id}>
-                        <ActivityCard card={c} ws={ws} sections={ws.sections as Section[]} canMoveUp={i > 0} canMoveDown={i < g.cards.length - 1} onEdit={(x) => openEdit(x.instance.id)} onDelete={setDeleting} onMove={move} />
+                        <ActivityCard card={c} ws={ws} sections={ws.sections as Section[]} canMoveUp={i > 0} canMoveDown={i < g.cards.length - 1} onEdit={(x) => openEdit(x.instance.id)} onDelete={setDeleting} onMove={move} onReschedule={(card, mode) => setResched({ card, mode })} />
                       </li>
                     ))}
                   </ul>
@@ -179,16 +184,18 @@ export function TodayPage() {
       {sectionsOpen && <SectionsSheet open onOpenChange={setSectionsOpen} />}
       <ApplyLayoutSheet open={applyOpen} onOpenChange={setApplyOpen} date={date} />
       {saveOpen && <SaveLayoutSheet open onOpenChange={setSaveOpen} date={date} />}
+      {resched && <RescheduleSheet card={resched.card.instance} mode={resched.mode} onClose={() => setResched(null)} />}
       {deleting && <DeleteCardDialog open onOpenChange={(o) => !o && setDeleting(null)} inst={deleting.instance} />}
     </div>
   );
 }
 
-function DayMenu(p: { onArrange: () => void; onSections: () => void; onApply: () => void; onSave: () => void }) {
+function DayMenu(p: { onSearch: () => void; onArrange: () => void; onSections: () => void; onApply: () => void; onSave: () => void }) {
   const item = "flex min-h-11 cursor-default items-center gap-3 rounded-xl px-3 text-[15px] outline-none data-[highlighted]:bg-white/10";
   return (
     <Menu.Portal>
       <Menu.Content align="end" sideOffset={6} className="z-50 min-w-60 rounded-2xl border border-line bg-surface-2 p-1.5 shadow-2xl">
+        <Menu.Item className={item} onSelect={p.onSearch}><Search size={16} aria-hidden /> Search…</Menu.Item>
         <Menu.Item className={item} onSelect={p.onArrange}><ListOrdered size={16} aria-hidden /> Arrange cards</Menu.Item>
         <Menu.Item className={item} onSelect={p.onSections}><Rows3 size={16} aria-hidden /> Edit sections</Menu.Item>
         <Menu.Item className={item} onSelect={p.onApply}><LayoutTemplate size={16} aria-hidden /> Apply a day layout…</Menu.Item>

@@ -1,5 +1,5 @@
 "use client";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { addDays, formatLong } from "@/lib/domain/dates";
@@ -8,7 +8,8 @@ import { cardProgress, emptyState } from "@/lib/domain/progress";
 import type { CardInstance, DateStr, ProgressRecord } from "@/lib/domain/types";
 import { useApp } from "@/store/app";
 import { Page, PageHeader } from "./PageHeader";
-import { Segmented, Spinner } from "./ui";
+import { Button, Segmented, Spinner } from "./ui";
+import { useUi } from "@/store/ui";
 
 export function HistoryPage() {
   const planner = useApp((s) => s.planner);
@@ -35,7 +36,7 @@ export function HistoryPage() {
 
   return (
     <Page>
-      <PageHeader title="History" subtitle="What was recorded on earlier days. Editing a routine never changes these records, and days without records are simply blank — never a failure." actions={<Segmented label="Range" value={String(days) as "14"} onChange={(v) => setDays(Number(v) as 14)} options={[{ value: "14", label: "2 weeks" }, { value: "30", label: "30 days" }, { value: "90", label: "90 days" }]} />} />
+      <PageHeader title="History" subtitle="What was recorded on earlier days. Editing a routine never changes these records, and days without records are simply blank — never a failure." actions={<><Button small onClick={() => useUi.getState().setSearchOpen(true)}><Search size={14} aria-hidden /> Search</Button><Segmented label="Range" value={String(days) as "14"} onChange={(v) => setDays(Number(v) as 14)} options={[{ value: "14", label: "2 weeks" }, { value: "30", label: "30 days" }, { value: "90", label: "90 days" }]} /></>} />
       {error ? <p role="alert" className="rounded-2xl border border-danger/50 bg-danger/10 p-4">Couldn’t load history: {error}</p> : !data ? <div className="flex justify-center py-12"><Spinner /></div> : dates.length === 0 ? (
         <p className="rounded-3xl border border-dashed border-line p-10 text-center text-muted">No earlier days recorded in this range yet.</p>
       ) : (

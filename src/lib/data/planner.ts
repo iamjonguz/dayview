@@ -2,7 +2,7 @@ import { addDays, todayIn, weekdayOf } from "../domain/dates";
 import { buildDayView, planPlacements, type DayView } from "../domain/dayview";
 import { cloneSpec, uid } from "../domain/factory";
 import { canEditCard, canEditRole, canManageGroup, canShareCard, roleIn, scopeFor, canUpdateProgress } from "../domain/permissions";
-import { hasAnyState } from "../domain/progress";
+import { cardProgress, emptyState, hasAnyState } from "../domain/progress";
 import { occursOn } from "../domain/recurrence";
 import {
   PermissionError,
@@ -263,6 +263,54 @@ export class Planner {
   async skipCard(inst: CardInstance, skipped: boolean) {
     if (!canEditCard(inst, this.me.id, this.ws.members)) throw new PermissionError();
     return this.repo.updateInstance({ ...inst, skipped }, inst.rev);
+  }
+
+  /** Independent personal copy of a card on another day (progress isn't copied). */
+  async copyCardToDate(inst: CardInstance, date: DateStr): Promise<CardInstance> {
+    const created = (await this.repo.createInstance(this.newInstance(date, cloneSpec(inst.spec))))!;
+    await this.place(created);
+    return created;
+  }
+
+  /**
+   * Reschedule a card. One-offs and shared cards change date in place. A routine's occurrence can't move
+   * (it would be regenerated), so that day is skipped and a one-off copy is created on the new day.
+   */
+  async moveCardToDate(inst: CardInstance, date: DateStr): Promise<CardInstance> {
+    if (date === inst.date) return inst;
+    if (!canEditCard(inst, this.me.id, this.ws.members)) throw new PermissionError();
+    if (inst.seriesId && !inst.groupId) {
+      const copy = await this.copyCardToDate(inst, date);
+      await this.skipCard(inst, true);
+      return copy;
+    }
+    return this.repo.updateInstance({ ...inst, date }, inst.rev);
+  }
+
+  /** My own one-off cards from a day that were never completed (candidates to carry over). Routines and shared cards are excluded. */
+  async unfinishedFrom(date: DateStr): Promise<CardInstance[]> {
+    const d = await this.repo.loadDay(date);
+    const state = new Map(d.progress.filter((p) => p.scope === this.me.id).map((p) => [p.instanceId, p.state]));
+    return d.instances.filter((i) => i.ownerId === this.me.id && !i.groupId && !i.seriesId && !i.skipped && !cardProgress(i.spec, state.get(i.id) ?? emptyState()).complete);
+  }
+
+  async carryOver(ids: ID[], from: DateStr, to: DateStr) {
+    const list = (await this.repo.loadDay(from)).instances.filter((i) => ids.includes(i.id));
+    for (const i of list) await this.moveCardToDate(i, to);
+    return list.length;
+  }
+
+  /** Find cards by title, summary, notes or checklist text within a year either side of today. */
+  async search(query: string): Promise<CardInstance[]> {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const today = this.today();
+    const { instances } = await this.repo.loadRange(addDays(today, -365), addDays(today, 365));
+    const text = (i: CardInstance) =>
+      [i.spec.title, i.spec.summary, ...i.spec.blocks.flatMap((b) => (b.type === "note" ? [b.title, b.text] : b.type === "checklist" ? [b.title, ...b.items.map((x) => x.text)] : [b.title]))]
+        .join("\n")
+        .toLowerCase();
+    return instances.filter((i) => text(i).includes(q)).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 100);
   }
 
   /** Skip / un-skip by id, always against the latest stored revision (safe for Undo). */

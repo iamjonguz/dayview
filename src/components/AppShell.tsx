@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/store/app";
 import { AuthPanel } from "./AuthPanel";
 import { CardEditorHost } from "./CardEditor";
+import { SearchSheet } from "./FindAndCarry";
 import { Button, Sheet, Spinner, Toasts } from "./ui";
 
 const NAV = [
@@ -69,6 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </ul>
       </nav>
       <CardEditorHost />
+      <SearchSheet />
       <Toasts />
       <Sheet open={info} onOpenChange={setInfo} title="You’re in demo mode" description="No account or backend is connected.">
         <div className="space-y-3 text-[15px]">

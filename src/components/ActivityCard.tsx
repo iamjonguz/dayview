@@ -4,6 +4,8 @@ import clsx from "clsx";
 import {
   ArrowDown,
   ArrowUp,
+  CalendarClock,
+  CalendarPlus,
   Check,
   Clock,
   Copy,
@@ -40,6 +42,7 @@ interface Props {
   onEdit: (c: DayCard) => void;
   onDelete: (c: DayCard) => void;
   onMove: (c: DayCard, m: MoveRequest) => void;
+  onReschedule: (c: DayCard, mode: "move" | "copy") => void;
 }
 
 const FLIP_OUT_MS = 150;
@@ -206,7 +209,7 @@ function Front({ card, ws, onFlip, flipRef }: Props & { onFlip: () => void; flip
 /* ------------------------------------------------------------------ back */
 const Label = ({ children }: { children: React.ReactNode }) => <h4 className="mb-1 text-[13px] font-semibold uppercase tracking-wide text-amber">{children}</h4>;
 
-function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, onMove, onFlip, flipRef }: Props & { onFlip: () => void; flipRef: React.RefObject<HTMLButtonElement | null> }) {
+function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, onMove, onReschedule, onFlip, flipRef }: Props & { onFlip: () => void; flipRef: React.RefObject<HTMLButtonElement | null> }) {
   const { instance: inst } = card;
   const { spec } = inst;
   const act = useApp((s) => s.act);
@@ -332,6 +335,8 @@ function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, on
                     Skip this day
                   </Item>
                 )}
+                {card.canEdit && <Item icon={<CalendarClock size={16} />} onSelect={() => onReschedule(card, "move")}>Move to another day…</Item>}
+                <Item icon={<CalendarPlus size={16} />} onSelect={() => onReschedule(card, "copy")}>Copy to another day…</Item>
                 <Menu.Separator className="my-1 h-px bg-line" />
                 <Item icon={<ArrowUp size={16} />} disabled={!canMoveUp} onSelect={() => onMove(card, { dir: -1 })}>Move up</Item>
                 <Item icon={<ArrowDown size={16} />} disabled={!canMoveDown} onSelect={() => onMove(card, { dir: 1 })}>Move down</Item>
