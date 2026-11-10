@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg: #1b1714;
+  --color-surface: #252019;
+  --color-surface-2: #2f2922;
+  --color-line: #40372f;
+  --color-ivory: #f5ede0;
+  --color-muted: #b6a999;
+  --color-amber: #e8a04c;
+  --color-amber-ink: #26190a;
+  --color-danger: #ee8a79;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-display), "Iowan Old Style", Georgia, serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-bg);
+}
+body {
+  background: var(--color-bg);
+  color: var(--color-ivory);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-anchor: auto;
+}
+
+/* ---- focus: always visible, amber ---- */
+:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---- card flip: two quick half-turns; only one face exists in the DOM at a time ---- */
+@keyframes flip-out {
+  from { transform: perspective(900px) rotateY(0deg); opacity: 1; }
+  to { transform: perspective(900px) rotateY(88deg); opacity: 0.6; }
+}
+@keyframes flip-in {
+  from { transform: perspective(900px) rotateY(-88deg); opacity: 0.6; }
+  to { transform: perspective(900px) rotateY(0deg); opacity: 1; }
+}
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.flip-out { animation: flip-out 150ms ease-in forwards; }
+.flip-in { animation: flip-in 190ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .flip-out { animation: fade-out 90ms linear forwards; }
+  .flip-in { animation: fade-in 120ms linear; }
+  * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+}
+
+@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sheet-in { animation: sheet-in 180ms ease-out; }
+@keyframes toast-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.toast-in { animation: toast-in 160ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .sheet-in, .toast-in { animation: none; }
+}
+
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+
+/* ---- text over imagery: guaranteed contrast ---- */
+.cover-scrim {
+  background:
+    linear-gradient(to top, rgba(18, 13, 9, 0.94) 0%, rgba(18, 13, 9, 0.72) 42%, rgba(18, 13, 9, 0.2) 78%, rgba(18, 13, 9, 0.35) 100%);
+}
+.text-shadow-soft { text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55); }
