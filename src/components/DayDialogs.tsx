@@ -21,7 +21,7 @@ export function DatePickerSheet({ open, onOpenChange }: { open: boolean; onOpenC
       <div className="mx-auto max-w-sm">
         <div className="mb-2 flex items-center justify-between">
           <IconButton label="Previous month" variant="ghost" onClick={() => shiftMonth(-1)}><ChevronLeft size={20} /></IconButton>
-          <p className="font-serif text-xl" aria-live="polite">{formatMonthYear(month)}</p>
+          <p className="font-semibold text-xl" aria-live="polite">{formatMonthYear(month)}</p>
           <IconButton label="Next month" variant="ghost" onClick={() => shiftMonth(1)}><ChevronRight size={20} /></IconButton>
         </div>
         <div role="grid" aria-label={formatMonthYear(month)} className="grid grid-cols-7 gap-1 text-center">
@@ -37,7 +37,7 @@ export function DatePickerSheet({ open, onOpenChange }: { open: boolean; onOpenC
                 aria-current={d === today ? "date" : undefined}
                 aria-label={formatLong(d)}
                 onClick={() => { void setDate(d); onOpenChange(false); }}
-                className={clsx("grid min-h-11 place-items-center rounded-xl text-[15px]", sel ? "bg-amber font-semibold text-amber-ink" : "hover:bg-surface-2", !inMonth && !sel && "text-muted/50", d === today && !sel && "ring-1 ring-amber")}
+                className={clsx("grid min-h-11 place-items-center rounded-xl text-[15px]", sel ? "bg-accent font-semibold text-accent-ink" : "hover:bg-surface-2", !inMonth && !sel && "text-muted/50", d === today && !sel && "ring-1 ring-accent")}
               >
                 {Number(d.slice(8))}
               </button>
@@ -81,19 +81,19 @@ export function SectionsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
           {rows.map((r, i) => (
             <li key={r.id} className="rounded-2xl border border-line bg-bg/60 p-3">
               <div className="flex items-center gap-1">
-                <input aria-label={`Section ${i + 1} name`} className={clsx(inputCls, "min-h-10")} value={r.name} onChange={(e) => upd(r.id, { name: e.target.value })} />
-                <IconButton label="Move up" variant="ghost" className="size-10" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={16} /></IconButton>
-                <IconButton label="Move down" variant="ghost" className="size-10" disabled={i === rows.length - 1} onClick={() => move(i, 1)}><ArrowDown size={16} /></IconButton>
-                <IconButton label={`Delete section ${r.name}`} variant="ghost" className="size-10 text-danger" onClick={() => setRemoving(r)}><Trash2 size={16} /></IconButton>
+                <input aria-label={`Section ${i + 1} name`} className={inputCls} value={r.name} onChange={(e) => upd(r.id, { name: e.target.value })} />
+                <IconButton label="Move up" variant="ghost"  disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={16} /></IconButton>
+                <IconButton label="Move down" variant="ghost"  disabled={i === rows.length - 1} onClick={() => move(i, 1)}><ArrowDown size={16} /></IconButton>
+                <IconButton label={`Delete section ${r.name}`} variant="ghost" className="text-danger" onClick={() => setRemoving(r)}><Trash2 size={16} /></IconButton>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <label className="text-sm text-muted">Icon
-                  <select className={clsx(inputCls, "mt-1 min-h-10")} value={r.icon} onChange={(e) => upd(r.id, { icon: e.target.value as Section["icon"] })}>
+                  <select className={clsx(inputCls, "mt-1")} value={r.icon} onChange={(e) => upd(r.id, { icon: e.target.value as Section["icon"] })}>
                     {["sunrise", "sun", "moon", "star", "none"].map((x) => <option key={x}>{x}</option>)}
                   </select>
                 </label>
                 <label className="text-sm text-muted">Starts around
-                  <input type="time" className={clsx(inputCls, "mt-1 min-h-10")} value={r.from ?? ""} onChange={(e) => upd(r.id, { from: e.target.value || undefined })} />
+                  <input type="time" className={clsx(inputCls, "mt-1")} value={r.from ?? ""} onChange={(e) => upd(r.id, { from: e.target.value || undefined })} />
                 </label>
               </div>
             </li>
@@ -145,7 +145,7 @@ export function AutoApplyPicker({ value, onChange }: { value: number[]; onChange
         {[1, 2, 3, 4, 5, 6, 0].map((d) => {
           const on = value.includes(d);
           return (
-            <button key={d} type="button" aria-pressed={on} onClick={() => onChange(on ? value.filter((x) => x !== d) : [...value, d])} className={clsx("min-h-11 min-w-12 rounded-xl border px-2 text-sm", on ? "border-amber bg-amber font-semibold text-amber-ink" : "border-line hover:bg-surface-2")}>
+            <button key={d} type="button" aria-pressed={on} onClick={() => onChange(on ? value.filter((x) => x !== d) : [...value, d])} className={clsx("min-h-11 min-w-12 rounded-xl border px-2 text-sm", on ? "border-accent bg-accent font-semibold text-accent-ink" : "border-line hover:bg-surface-2")}>
               {WEEKDAY_SHORT[d]}
             </button>
           );

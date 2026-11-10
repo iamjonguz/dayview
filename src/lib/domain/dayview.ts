@@ -1,6 +1,6 @@
 import { compareTimes } from "./dates";
 import { scopeFor, canEditCard, canUpdateProgress } from "./permissions";
-import { cardProgress, emptyState, type CardProgress } from "./progress";
+import { cardProgress, emptyState, resolveSummary, type CardProgress } from "./progress";
 import type {
   CardInstance,
   DayData,
@@ -20,6 +20,8 @@ export interface DayCard {
   /** My progress scope's state (shared for "together", my own otherwise). */
   state: ProgressState;
   progress: CardProgress;
+  /** Front-of-card summary (written text, next checklist item, or a block's progress). */
+  summary: string;
   density: Density;
   canEdit: boolean;
   canProgress: boolean;
@@ -145,7 +147,9 @@ export function buildDayView(args: {
       placement: { ...placement, sectionId: placement.sectionId && sectionIds.has(placement.sectionId) ? placement.sectionId : null },
       state,
       progress: cardProgress(instance.spec, state),
-      density: placement.density ?? instance.spec.density ?? args.defaultDensity,
+      summary: resolveSummary(instance.spec, state),
+      // precedence: this person's own choice for the card → a card set to "always compact" → their day-view preference
+      density: placement.density ?? (instance.spec.density === "compact" ? "compact" : args.defaultDensity),
       canEdit: canEditCard(instance, me, members),
       canProgress: canUpdateProgress(instance, me, scope, members),
       others,

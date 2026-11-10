@@ -96,13 +96,13 @@ describe("shared cards", () => {
     // Maja moves the shared card to Evening, last; hides and compacts it
     const mdata = await maja.loadDay(TODAY);
     await maja.saveDayOrder(TODAY, [{ sectionId: "sec-evening", ids: [extra.id, card.id] }], mdata.placements);
-    await maja.setPlacementFlags(card, { density: "compact" });
+    await maja.setPlacementFlags(card, { density: "comfortable" });
     const mview = maja.view(await maja.loadDay(TODAY));
     expect(mview.sections.find((s) => s.section?.id === "sec-evening")!.cards.map((c) => c.instance.id)).toEqual([extra.id, card.id]);
-    expect(mview.sections.flatMap((s) => s.cards).find((c) => c.instance.id === card.id)!.density).toBe("compact");
+    expect(mview.sections.flatMap((s) => s.cards).find((c) => c.instance.id === card.id)!.density).toBe("comfortable"); // Maja's own override
     const myAfter = me.view(await me.loadDay(TODAY));
     expect(myAfter.sections.flatMap((s) => s.cards.map((c) => c.instance.id))).toEqual(myBefore);
-    expect(myAfter.sections.flatMap((s) => s.cards).find((c) => c.instance.id === card.id)!.density).toBe("comfortable");
+    expect(myAfter.sections.flatMap((s) => s.cards).find((c) => c.instance.id === card.id)!.density).toBe("compact"); // my own default, unaffected by Maja's override
     // hiding for Maja doesn't hide it for me
     await maja.setPlacementFlags(card, { hidden: true });
     expect(maja.view(await maja.loadDay(TODAY)).hidden).toHaveLength(1);

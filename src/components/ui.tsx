@@ -8,10 +8,10 @@ import { useApp } from "@/store/app";
 
 type Variant = "primary" | "outline" | "ghost" | "danger" | "soft";
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-amber text-amber-ink font-semibold hover:brightness-110 active:brightness-95",
-  outline: "border border-line text-ivory hover:bg-surface-2 active:bg-surface",
-  ghost: "text-ivory hover:bg-surface-2",
-  soft: "bg-surface-2 text-ivory hover:bg-line",
+  primary: "bg-accent text-accent-ink font-semibold hover:brightness-110 active:brightness-95",
+  outline: "border border-line text-fg hover:bg-surface-2 active:bg-surface",
+  ghost: "text-fg hover:bg-surface-2",
+  soft: "bg-surface-2 text-fg hover:bg-line",
   danger: "border border-danger/50 text-danger hover:bg-danger/10",
 };
 
@@ -24,7 +24,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
         {...p}
         className={clsx(
           "inline-flex items-center justify-center gap-2 rounded-xl px-4 text-[15px] transition-colors disabled:cursor-not-allowed disabled:opacity-45",
-          small ? "min-h-10 px-3 text-sm" : "min-h-11",
+          small ? "min-h-11 px-3 text-sm" : "min-h-11",
           VARIANTS[variant],
           className,
         )}
@@ -44,7 +44,7 @@ export const IconButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTM
         {...p}
         className={clsx(
           "inline-flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors disabled:opacity-40",
-          bare ? "text-ivory hover:bg-white/10" : VARIANTS[variant],
+          bare ? "text-fg hover:bg-white/10" : VARIANTS[variant],
           className,
         )}
       >
@@ -55,7 +55,7 @@ export const IconButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTM
 );
 
 export const inputCls =
-  "w-full min-h-11 rounded-xl border border-line bg-bg px-3 text-[15px] text-ivory placeholder:text-muted/70 focus:border-amber disabled:opacity-50";
+  "w-full min-h-11 rounded-xl border border-line bg-bg px-3 text-[15px] text-fg placeholder:text-muted/70 focus:border-accent disabled:opacity-50";
 
 export function Field({ label, hint, children, htmlFor }: { label: string; hint?: string; children: ReactNode; htmlFor?: string }) {
   return (
@@ -78,6 +78,7 @@ export function Sheet({
   children,
   footer,
   wide,
+  full,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -86,6 +87,8 @@ export function Sheet({
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
+  /** Full-screen on phones (editors). */
+  full?: boolean;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -94,15 +97,15 @@ export function Sheet({
         <Dialog.Content
           aria-describedby={description ? undefined : undefined}
           className={clsx(
-            "sheet-in fixed z-50 flex flex-col border border-line bg-surface shadow-2xl outline-none",
-            "inset-x-0 bottom-0 top-6 rounded-t-3xl",
-            "md:inset-auto md:left-1/2 md:top-1/2 md:max-h-[88dvh] md:w-[calc(100%-2rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-3xl",
+            "sheet-in fixed z-50 flex flex-col border-line bg-surface outline-none",
+            full ? "inset-0 rounded-none" : "inset-x-0 bottom-0 top-10 rounded-t-2xl border-x border-t",
+            "md:inset-auto md:left-1/2 md:top-1/2 md:max-h-[88dvh] md:w-[calc(100%-2rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:border",
             wide ? "md:max-w-3xl" : "md:max-w-lg",
           )}
         >
-          <header className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
+          <header className="flex items-start justify-between gap-3 border-b border-line px-4 py-3 md:px-5 md:py-4">
             <div>
-              <Dialog.Title className="font-serif text-2xl leading-tight">{title}</Dialog.Title>
+              <Dialog.Title className="text-xl font-semibold leading-snug">{title}</Dialog.Title>
               {description ? <Dialog.Description className="mt-1 text-sm text-muted">{description}</Dialog.Description> : <Dialog.Description className="sr-only">{title}</Dialog.Description>}
             </div>
             <Dialog.Close asChild>
@@ -111,8 +114,8 @@ export function Sheet({
               </IconButton>
             </Dialog.Close>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
-          {footer && <footer className="pb-safe flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3">{footer}</footer>}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-5">{children}</div>
+          {footer && <footer className="pb-safe flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface px-4 py-3 md:px-5">{footer}</footer>}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -142,8 +145,8 @@ export function Confirm({
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 z-[60] bg-black/70" />
-        <AlertDialog.Content className="sheet-in fixed left-1/2 top-1/2 z-[70] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-line bg-surface p-6 shadow-2xl outline-none">
-          <AlertDialog.Title className="font-serif text-2xl">{title}</AlertDialog.Title>
+        <AlertDialog.Content className="sheet-in fixed left-1/2 top-1/2 z-[70] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-line bg-surface p-5 outline-none">
+          <AlertDialog.Title className="text-xl font-semibold">{title}</AlertDialog.Title>
           <AlertDialog.Description asChild>
             <div className="mt-2 text-[15px] text-muted">{description}</div>
           </AlertDialog.Description>
@@ -178,20 +181,20 @@ export function Toasts() {
   const toasts = useApp((s) => s.toasts);
   const dismiss = useApp((s) => s.dismissToast);
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[80] flex flex-col items-center gap-2 px-4 md:bottom-6" role="region" aria-label="Notifications">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--nav-h)+env(safe-area-inset-bottom,0px)+0.75rem)] z-[80] flex flex-col items-center gap-2 px-4 md:bottom-6" role="region" aria-label="Notifications">
       {toasts.map((t) => (
         <div
           key={t.id}
           role={t.kind === "error" ? "alert" : "status"}
           className={clsx(
-            "toast-in pointer-events-auto flex max-w-md items-center gap-3 rounded-2xl border px-4 py-3 text-sm shadow-xl",
-            t.kind === "error" ? "border-danger/60 bg-[#3a2420] text-ivory" : "border-line bg-surface-2 text-ivory",
+            "toast-in pointer-events-auto flex max-w-md items-center gap-3 rounded-xl border px-4 py-3 text-[15px] ",
+            t.kind === "error" ? "border-danger/60 bg-surface-2 text-fg" : "border-line bg-surface-2 text-fg",
           )}
         >
           <span className="flex-1">{t.message}</span>
           {t.action && (
             <button
-              className="rounded-lg px-2 py-1 font-semibold text-amber hover:bg-white/10"
+              className="rounded-lg px-2 py-1 font-semibold text-accent hover:bg-white/10"
               onClick={async () => {
                 dismiss(t.id);
                 await t.action!.run();
@@ -219,7 +222,7 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={clsx("min-h-9 rounded-lg px-3 text-sm transition-colors", value === o.value ? "bg-amber text-amber-ink font-semibold" : "text-ivory hover:bg-surface-2")}
+          className={clsx("min-h-11 rounded-lg px-3 text-sm transition-colors", value === o.value ? "bg-accent text-accent-ink font-semibold" : "text-fg hover:bg-surface-2")}
         >
           {o.label}
         </button>
@@ -228,4 +231,4 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
   );
 }
 
-export const Spinner = () => <div className="size-5 animate-spin rounded-full border-2 border-line border-t-amber" role="status" aria-label="Loading" />;
+export const Spinner = () => <div className="size-5 animate-spin rounded-full border-2 border-line border-t-accent" role="status" aria-label="Loading" />;

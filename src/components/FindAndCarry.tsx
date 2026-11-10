@@ -75,7 +75,7 @@ export function CarryOver() {
           {items.map((i) => (
             <li key={i.id}>
               <label className="flex min-h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
-                <input type="checkbox" className="size-5 accent-[var(--color-amber)]" checked={sel.includes(i.id)} onChange={(e) => setSel(e.target.checked ? [...sel, i.id] : sel.filter((x) => x !== i.id))} />
+                <input type="checkbox" className="size-5 accent-[var(--color-accent)]" checked={sel.includes(i.id)} onChange={(e) => setSel(e.target.checked ? [...sel, i.id] : sel.filter((x) => x !== i.id))} />
                 <span>{i.spec.title}</span>
                 {i.spec.time && <span className="text-sm text-muted">{i.spec.time}</span>}
               </label>
@@ -117,7 +117,7 @@ export function SearchSheet() {
               <li key={i.id}>
                 <button className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl px-2 text-left hover:bg-surface-2" onClick={() => { void setDate(i.date); router.push("/"); setOpen(false); }}>
                   <span>{i.spec.title}{i.spec.summary && <span className="ml-2 text-sm text-muted">{i.spec.summary}</span>}</span>
-                  <span className="shrink-0 text-sm text-amber">{formatShort(i.date)}</span>
+                  <span className="shrink-0 text-sm text-accent">{formatShort(i.date)}</span>
                 </button>
               </li>
             ))}

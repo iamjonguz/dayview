@@ -4,6 +4,7 @@ import { CalendarDays, History, Layers, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BRAND } from "@/lib/brand";
 import { useApp } from "@/store/app";
 import { AuthPanel } from "./AuthPanel";
 import { CardEditorHost } from "./CardEditor";
@@ -30,8 +31,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (phase === "error")
     return (
       <main className="grid min-h-dvh place-items-center p-6">
-        <div role="alert" className="max-w-md rounded-3xl border border-danger/50 bg-danger/10 p-6 text-center">
-          <h1 className="font-serif text-2xl">Dayview couldn’t start</h1>
+        <div role="alert" className="max-w-md rounded-2xl border border-danger/50 bg-danger/10 p-6 text-center">
+          <h1 className="text-xl font-semibold">{BRAND.name} couldn’t start</h1>
           <p className="mt-2 text-sm text-muted">{fatal}</p>
           <Button className="mt-4" onClick={() => void boot()}>Try again</Button>
         </div>
@@ -43,27 +44,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
 
   const active = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  const railItems = [...NAV, { href: "/settings", label: "Settings", icon: Settings }];
   return (
-    <div className="min-h-dvh md:pl-60">
+    <div className="min-h-dvh md:pl-[4.5rem] lg:pl-56">
       {mode === "demo" && <DemoBanner onInfo={() => setInfo(true)} />}
-      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-line bg-[#171310] p-4 md:flex" aria-label="Primary">
-        <p className="mb-6 px-3 pt-2 font-serif text-2xl text-amber">Dayview</p>
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[4.5rem] flex-col border-r border-line bg-nav px-2 py-4 md:flex lg:w-56 lg:px-3" aria-label="Primary">
+        <p className="mb-6 flex items-center justify-center gap-2 px-1 pt-1 text-lg font-semibold lg:justify-start lg:px-3">
+          <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-accent text-sm font-bold text-accent-ink">{BRAND.name.charAt(0)}</span>
+          <span className="hidden lg:inline">{BRAND.name}</span>
+        </p>
         <nav className="space-y-1">
-          {[...NAV, { href: "/settings", label: "Settings", icon: Settings }].map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} aria-current={active(href) ? "page" : undefined} className={clsx("flex min-h-11 items-center gap-3 rounded-xl px-3 text-[15px]", active(href) ? "bg-surface-2 text-ivory" : "text-muted hover:bg-surface hover:text-ivory")}>
-              <Icon size={18} aria-hidden /> {label}
+          {railItems.map(({ href, label, icon: Icon }) => (
+            <Link key={href} href={href} aria-label={label} title={label} aria-current={active(href) ? "page" : undefined} className={clsx("flex min-h-11 items-center justify-center gap-3 rounded-xl px-3 text-[15px] lg:justify-start", active(href) ? "bg-surface-2 text-fg" : "text-muted hover:bg-surface hover:text-fg")}>
+              <Icon size={20} aria-hidden className={active(href) ? "text-accent" : ""} /> <span className="hidden lg:inline">{label}</span>
             </Link>
           ))}
         </nav>
       </aside>
-      <main className="pb-24 md:pb-0">{children}</main>
-      <nav aria-label="Primary" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-[#171310]/95 backdrop-blur md:hidden">
+      <main className="pb-[calc(var(--nav-h)+env(safe-area-inset-bottom,0px)+1rem)] md:pb-0">{children}</main>
+      <nav aria-label="Primary" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-nav md:hidden">
         <ul className="mx-auto grid max-w-md grid-cols-4">
           {NAV.map(({ href, label, icon: Icon }) => (
             <li key={href}>
-              <Link href={href} aria-current={active(href) ? "page" : undefined} className={clsx("relative flex min-h-16 flex-col items-center justify-center gap-1 text-xs", active(href) ? "text-amber" : "text-muted")}>
+              <Link href={href} aria-current={active(href) ? "page" : undefined} className={clsx("relative flex h-16 flex-col items-center justify-center gap-1 text-[13px] font-medium", active(href) ? "text-accent" : "text-muted")}>
                 <Icon size={22} aria-hidden /> {label}
-                {active(href) && <span aria-hidden className="absolute bottom-0 h-0.5 w-10 rounded-full bg-amber" />}
+                {active(href) && <span aria-hidden className="absolute top-0 h-0.5 w-10 rounded-full bg-accent" />}
               </Link>
             </li>
           ))}
@@ -72,11 +77,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <CardEditorHost />
       <SearchSheet />
       <Toasts />
-      <Sheet open={info} onOpenChange={setInfo} title="You’re in demo mode" description="No account or backend is connected.">
+      <Sheet open={info} onOpenChange={setInfo} title="About demo mode" description="No account or backend is connected.">
         <div className="space-y-3 text-[15px]">
-          <p>Everything you see is saved in <strong>this browser only</strong> (localStorage) so you can try the whole app straight away. Reloading keeps your changes; clearing site data or using Settings → Reset removes them.</p>
-          <p><strong>Sharing across accounts needs the backend.</strong> The “Family” group, Maja and Erik are <strong>sample members stored locally</strong> — a way to preview how shared cards behave. No one else can see your data, and nothing is sent anywhere.</p>
-          <p className="text-muted">To enable real accounts, groups, invitations and live sharing, connect Supabase — see the README (set <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, then run the migration).</p>
+          <p>Everything is saved in <strong>this browser only</strong>, so you can try the whole app right away. Reloading keeps your changes; Settings → Reset removes them.</p>
+          <p><strong>Sharing across accounts needs the backend.</strong> The Family group, Maja and Erik are <strong>sample members stored locally</strong> to preview how shared cards behave. Nothing is sent anywhere.</p>
+          <p className="text-muted">To enable real accounts, groups and invitations, connect Supabase (see the README).</p>
         </div>
       </Sheet>
     </div>
@@ -85,9 +90,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function DemoBanner({ onInfo }: { onInfo: () => void }) {
   return (
-    <div className="flex min-h-9 items-center justify-center gap-2 border-b border-amber/30 bg-amber/10 px-3 py-1 text-center text-[13px]">
-      <span><strong className="font-semibold text-amber">Demo mode</strong> · saved on this device only<span className="hidden sm:inline"> · sample group members are simulated</span></span>
-      <button onClick={onInfo} className="min-h-8 rounded-md px-2 font-medium text-amber underline underline-offset-2 hover:bg-amber/10">Details</button>
+    <div className="flex min-h-9 items-center justify-center gap-2 border-b border-line bg-nav px-3 text-[14px] text-muted">
+      <span aria-hidden className="size-1.5 rounded-full bg-accent" />
+      <span><strong className="font-semibold text-fg">Demo</strong> · saved on this device only</span>
+      <button onClick={onInfo} className="-my-1 inline-flex min-h-11 items-center rounded-md px-2 font-medium text-accent underline underline-offset-2">Details</button>
     </div>
   );
 }

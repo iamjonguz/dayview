@@ -92,13 +92,13 @@ export function ArrangeView({ view, sections, onChange }: { view: DayView; secti
           return (
             <Zone key={key(g.sectionId)} id={key(g.sectionId)} title={nameOf(g.sectionId)}>
               <SortableContext items={g.ids} strategy={verticalListSortingStrategy}>
-                <ul className="grid gap-2 md:grid-cols-2">
+                <ul className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,19rem),1fr))]">
                   {g.ids.map((id, i) => (
                     <Row key={id} card={cards.get(id)!} index={i} count={g.ids.length} sections={sections} current={g.sectionId} onNudge={nudge} onSection={toSection} />
                   ))}
                 </ul>
               </SortableContext>
-              {g.ids.length === 0 && <p className="rounded-2xl border border-dashed border-line p-4 text-center text-sm text-muted">Drop a card here, or use a card’s section menu.</p>}
+              {g.ids.length === 0 && <p className="rounded-xl border border-dashed border-line p-4 text-center text-[15px] text-muted">Drop a card here, or use a card’s section menu.</p>}
             </Zone>
           );
         })}
@@ -110,8 +110,8 @@ export function ArrangeView({ view, sections, onChange }: { view: DayView; secti
 function Zone({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <section ref={setNodeRef} aria-label={title} className={clsx("rounded-3xl p-1 transition-colors", isOver && "bg-amber/5")}>
-      <h2 className="mb-2 px-1 font-serif text-2xl">{title}</h2>
+    <section ref={setNodeRef} aria-label={title} className={clsx("rounded-2xl p-1 transition-colors", isOver && "bg-surface/60")}>
+      <h2 className="mb-1.5 px-1 text-[15px] font-semibold text-muted">{title}</h2>
       {children}
     </section>
   );
@@ -122,20 +122,24 @@ function Row({ card, index, count, sections, current, onNudge, onSection }: { ca
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const spec = card.instance.spec;
   return (
-    <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={clsx("flex items-center gap-1 rounded-2xl border border-line bg-surface p-2", isDragging && "z-10 opacity-80 shadow-xl ring-1 ring-amber")}>
-      <button type="button" {...attributes} {...listeners} aria-label={`Drag ${spec.title}. Press space to pick up, arrow keys to move.`} className="grid size-11 shrink-0 touch-none place-items-center rounded-xl text-muted hover:bg-surface-2 active:cursor-grabbing">
-        <GripVertical size={20} />
-      </button>
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-serif text-lg leading-tight">{spec.title}</p>
-        <p className="truncate text-sm text-muted">{formatTimeRange(spec.time, spec.endTime) || "No time"}</p>
+    <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={clsx("min-w-0 rounded-xl border border-line bg-surface p-2", isDragging && "z-10 opacity-90 ring-2 ring-focus")}>
+      <div className="flex min-w-0 items-center gap-1">
+        <button type="button" {...attributes} {...listeners} aria-label={`Drag ${spec.title}. Press space to pick up, arrow keys to move.`} className="grid size-11 shrink-0 touch-none place-items-center rounded-lg text-muted hover:bg-surface-2 active:cursor-grabbing">
+          <GripVertical size={20} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[17px] font-semibold leading-snug">{spec.title}</p>
+          <p className="truncate text-[15px] text-muted">{formatTimeRange(spec.time, spec.endTime) || "No time"}</p>
+        </div>
       </div>
-      <select aria-label={`Section for ${spec.title}`} value={current ?? ""} onChange={(e) => onSection(id, e.target.value || null)} className="min-h-10 max-w-28 rounded-lg border border-line bg-bg px-1 text-sm">
-        <option value="">Anytime</option>
-        {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
-      <IconButton label={`Move ${spec.title} up`} variant="ghost" className="size-10" disabled={index === 0} onClick={() => onNudge(id, -1)}><ArrowUp size={16} /></IconButton>
-      <IconButton label={`Move ${spec.title} down`} variant="ghost" className="size-10" disabled={index === count - 1} onClick={() => onNudge(id, 1)}><ArrowDown size={16} /></IconButton>
+      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1 pl-12">
+        <select aria-label={`Section for ${spec.title}`} value={current ?? ""} onChange={(e) => onSection(id, e.target.value || null)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-bg px-2 text-[15px]">
+          <option value="">Anytime</option>
+          {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <IconButton label={`Move ${spec.title} up`} variant="outline" disabled={index === 0} onClick={() => onNudge(id, -1)}><ArrowUp size={18} /></IconButton>
+        <IconButton label={`Move ${spec.title} down`} variant="outline" disabled={index === count - 1} onClick={() => onNudge(id, 1)}><ArrowDown size={18} /></IconButton>
+      </div>
     </li>
   );
 }

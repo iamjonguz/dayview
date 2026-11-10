@@ -1,8 +1,8 @@
 "use client";
 import clsx from "clsx";
-import { ArrowDown, ArrowUp, Bold, CheckSquare, Italic, List, ListChecks, Plus, StickyNote, Target, Trash2, Users, X } from "lucide-react";
-import { useId, useRef, type ReactNode } from "react";
-import { ACCENTS, addBlock, uid } from "@/lib/domain/factory";
+import { ArrowDown, ArrowUp, Bold, Check, ChevronDown, CircleHelp, Italic, List, ListChecks, Plus, StickyNote, Target, Trash2, Users, X } from "lucide-react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { ACCENTS, addBlock, resolveAccent, uid } from "@/lib/domain/factory";
 import { trackingBlocks } from "@/lib/domain/progress";
 import type { Block, BlockType, CardSpec, Cover } from "@/lib/domain/types";
 import { COVER_COLORS, COVER_PRESETS, presetUri } from "@/lib/ui/covers";
@@ -15,15 +15,38 @@ const BLOCK_META: Record<BlockType, { label: string; icon: ReactNode }> = {
   responsibility: { label: "Responsibilities", icon: <Users size={16} /> },
 };
 
-function Group({ title, children, hint }: { title: string; children: ReactNode; hint?: string }) {
+/** A titled editor section. Not collapsible: used for the things people edit every time. */
+function Group({ title, children, help }: { title: string; children: ReactNode; help?: ReactNode }) {
   return (
     <section className="space-y-3">
-      <div>
-        <h3 className="font-serif text-xl">{title}</h3>
-        {hint && <p className="text-sm text-muted">{hint}</p>}
-      </div>
+      <h3 className="flex items-center gap-1 text-[17px] font-semibold">{title}{help}</h3>
       {children}
     </section>
+  );
+}
+
+/** Progressive disclosure for advanced options. The summary shows the current choice so closed sections still inform. */
+export function Disclosure({ title, summary, children, defaultOpen }: { title: string; summary?: string; children: ReactNode; defaultOpen?: boolean }) {
+  return (
+    <details open={defaultOpen} className="group rounded-xl border border-line bg-bg/40">
+      <summary className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-2">
+        <span className="text-[17px] font-semibold">{title}</span>
+        {summary && <span className="min-w-0 flex-1 truncate text-right text-[15px] text-muted">{summary}</span>}
+        <ChevronDown size={18} className={clsx("shrink-0 text-muted transition-transform group-open:rotate-180", !summary && "ml-auto")} aria-hidden />
+      </summary>
+      <div className="space-y-4 border-t border-line px-4 py-4">{children}</div>
+    </details>
+  );
+}
+
+/** Contextual help: detailed guidance stays out of the way until asked for. */
+export function Help({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" aria-label={label} aria-expanded={open} onClick={() => setOpen(!open)} className="grid size-11 place-items-center rounded-full text-muted hover:text-fg"><CircleHelp size={18} aria-hidden /></button>
+      {open && <p role="note" className="basis-full rounded-lg bg-surface-2 px-3 py-2 text-[15px] font-normal leading-snug text-muted">{children}</p>}
+    </>
   );
 }
 
@@ -40,44 +63,67 @@ export function SpecEditor({ spec, onChange }: { spec: CardSpec; onChange: (s: C
   };
   const removeBlock = (b: Block) => {
     const completion = spec.completion.mode === "derived" ? { mode: "derived" as const, blockIds: spec.completion.blockIds.filter((x) => x !== b.id) } : spec.completion;
-    set({ blocks: spec.blocks.filter((x) => x.id !== b.id), completion });
+    const summarySource = spec.summarySource && spec.summarySource.kind !== "text" && spec.summarySource.blockId === b.id ? undefined : spec.summarySource;
+    set({ blocks: spec.blocks.filter((x) => x.id !== b.id), completion, summarySource });
   };
   const tracking = trackingBlocks(spec);
   const derivedIds = spec.completion.mode === "derived" ? spec.completion.blockIds : [];
+  const src = spec.summarySource ?? { kind: "text" as const };
+  const srcValue = src.kind === "text" ? "text" : `${src.kind}:${src.blockId}`;
+  const sourceOptions = [
+    ...spec.blocks.filter((b) => b.type === "checklist").map((b) => ({ v: `next-item:${b.id}`, l: `Next item in “${b.title || "Checklist"}”` })),
+    ...spec.blocks.filter((b) => b.type === "progress").map((b) => ({ v: `progress:${b.id}`, l: `Progress of “${b.title || "Progress"}”` })),
+  ];
+  const onSource = (v: string) => {
+    if (v === "text") return set({ summarySource: undefined });
+    const [kind, blockId] = v.split(":") as ["next-item" | "progress", string];
+    set({ summarySource: { kind, blockId } });
+  };
+  const completionSummary = spec.completion.mode === "manual" ? "I mark it done" : "From checklists & targets";
+  const coverSummary = spec.cover.kind === "none" ? "No cover" : spec.cover.kind === "color" ? "Colour" : spec.cover.kind === "url" ? "Image" : (COVER_PRESETS.find((p) => spec.cover.kind === "preset" && p.id === spec.cover.id)?.label ?? "Cover");
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Group title="Basics">
         <Field label="Title" htmlFor={`${id}-title`}>
-          <input id={`${id}-title`} className={inputCls} value={spec.title} onChange={(e) => set({ title: e.target.value })} placeholder="e.g. Dinner" />
-        </Field>
-        <Field label="Summary" htmlFor={`${id}-sum`} hint="A short line shown on the front of the card.">
-          <input id={`${id}-sum`} className={inputCls} value={spec.summary} onChange={(e) => set({ summary: e.target.value })} placeholder="e.g. Salmon, rice & broccoli" />
+          <input id={`${id}-title`} className={inputCls} value={spec.title} onChange={(e) => set({ title: e.target.value })} placeholder="e.g. Dinner" autoComplete="off" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Starts (optional)" htmlFor={`${id}-t1`}>
+          <Field label="Time (optional)" htmlFor={`${id}-t1`}>
             <div className="flex gap-1">
               <input id={`${id}-t1`} type="time" className={inputCls} value={spec.time ?? ""} onChange={(e) => set({ time: e.target.value || undefined, endTime: e.target.value ? spec.endTime : undefined })} />
               {spec.time && <IconButton label="Clear time" variant="ghost" onClick={() => set({ time: undefined, endTime: undefined })}><X size={16} /></IconButton>}
             </div>
           </Field>
-          <Field label="Ends (optional)" htmlFor={`${id}-t2`}>
+          <Field label="Until (optional)" htmlFor={`${id}-t2`}>
             <input id={`${id}-t2`} type="time" disabled={!spec.time} className={inputCls} value={spec.endTime ?? ""} onChange={(e) => set({ endTime: e.target.value || undefined })} />
           </Field>
         </div>
-        <p className="text-xs text-muted">Cards without a time work fine — they simply sit in the order you give them.</p>
+        <Field label="Summary" htmlFor={`${id}-sum`}>
+          <input id={`${id}-sum`} className={inputCls} value={spec.summary} disabled={src.kind !== "text"} onChange={(e) => set({ summary: e.target.value })} placeholder={src.kind === "text" ? "One line shown on the card, e.g. Salmon, rice & broccoli" : "Shown automatically"} />
+        </Field>
+        {sourceOptions.length > 0 && (
+          <Field label="Summary shows" htmlFor={`${id}-src`}>
+            <select id={`${id}-src`} className={inputCls} value={srcValue} onChange={(e) => onSource(e.target.value)}>
+              <option value="text">The text I write</option>
+              {sourceOptions.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+          </Field>
+        )}
       </Group>
 
-      <Group title="Content" hint="Build the back of the card from blocks. Reorder with the arrows.">
+      <Group title="Content" help={<Help label="About content blocks">Build the back of the card from blocks and reorder them with the arrows. Notes can also be edited straight from the card.</Help>}>
         <div className="space-y-3">
           {spec.blocks.map((b, i) => (
-            <div key={b.id} className="rounded-2xl border border-line bg-bg/60 p-3">
-              <div className="flex items-center gap-2">
-                <span className="grid size-8 place-items-center rounded-lg bg-surface-2 text-amber" aria-hidden>{BLOCK_META[b.type].icon}</span>
-                <input aria-label={`${BLOCK_META[b.type].label} block title`} className={clsx(inputCls, "min-h-10 flex-1")} value={b.title} onChange={(e) => setBlock({ ...b, title: e.target.value })} placeholder={BLOCK_META[b.type].label} />
-                <IconButton label="Move block up" variant="ghost" disabled={i === 0} onClick={() => moveBlock(i, -1)} className="size-10"><ArrowUp size={16} /></IconButton>
-                <IconButton label="Move block down" variant="ghost" disabled={i === spec.blocks.length - 1} onClick={() => moveBlock(i, 1)} className="size-10"><ArrowDown size={16} /></IconButton>
-                <IconButton label={`Remove ${b.title || BLOCK_META[b.type].label} block`} variant="ghost" onClick={() => removeBlock(b)} className="size-10 text-danger"><Trash2 size={16} /></IconButton>
+            <div key={b.id} className="rounded-xl border border-line bg-bg/40 p-3">
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-accent" aria-hidden>{BLOCK_META[b.type].icon}</span>
+                <input aria-label={`${BLOCK_META[b.type].label} block title`} className={clsx(inputCls, "min-w-[7rem] flex-1")} value={b.title} onChange={(e) => setBlock({ ...b, title: e.target.value })} placeholder={BLOCK_META[b.type].label} />
+                <span className="ml-auto flex">
+                <IconButton label="Move block up" variant="ghost" disabled={i === 0} onClick={() => moveBlock(i, -1)}><ArrowUp size={16} /></IconButton>
+                <IconButton label="Move block down" variant="ghost" disabled={i === spec.blocks.length - 1} onClick={() => moveBlock(i, 1)}><ArrowDown size={16} /></IconButton>
+                <IconButton label={`Remove ${b.title || BLOCK_META[b.type].label} block`} variant="ghost" onClick={() => removeBlock(b)} className="text-danger"><Trash2 size={16} /></IconButton>
+                </span>
               </div>
               <div className="mt-3"><BlockBody block={b} onChange={setBlock} /></div>
             </div>
@@ -85,82 +131,72 @@ export function SpecEditor({ spec, onChange }: { spec: CardSpec; onChange: (s: C
         </div>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Add a block">
           {(Object.keys(BLOCK_META) as BlockType[]).map((t) => (
-            <Button key={t} small onClick={() => set({ blocks: [...spec.blocks, addBlock(t)] })}>
-              <Plus size={14} aria-hidden /> {BLOCK_META[t].label}
-            </Button>
+            <Button key={t} small onClick={() => set({ blocks: [...spec.blocks, addBlock(t)] })}><Plus size={14} aria-hidden /> {BLOCK_META[t].label}</Button>
           ))}
         </div>
       </Group>
 
-      <Group title="Completion" hint="How does this card become “done”?">
-        <Segmented
-          label="Completion rule"
-          value={spec.completion.mode}
-          onChange={(m) => set({ completion: m === "manual" ? { mode: "manual" } : { mode: "derived", blockIds: derivedIds.length ? derivedIds : tracking.map((t) => t.id) } })}
-          options={[{ value: "manual", label: "I mark it done" }, { value: "derived", label: "From checklists & targets" }]}
-        />
-        {spec.completion.mode === "manual" ? (
-          <p className="text-sm text-muted">Done only when you tick it. Checklists and targets still show progress, but never complete the card on their own.</p>
-        ) : tracking.length === 0 ? (
-          <p className="rounded-xl border border-amber/40 bg-amber/10 p-3 text-sm">Add a checklist or numeric target to use this rule. Until then the card can’t complete — notes alone never count.</p>
-        ) : (
-          <fieldset className="space-y-1">
-            <legend className="mb-1 text-sm text-muted">Done when all of these are complete:</legend>
-            {tracking.map((t) => (
-              <label key={t.id} className="flex min-h-10 items-center gap-3">
-                <input
-                  type="checkbox"
-                  className="size-5 accent-[var(--color-amber)]"
-                  checked={derivedIds.includes(t.id)}
-                  onChange={(e) => set({ completion: { mode: "derived", blockIds: e.target.checked ? [...derivedIds, t.id] : derivedIds.filter((x) => x !== t.id) } })}
-                />
-                <span>{t.title || BLOCK_META[t.type].label}</span>
-                <span className="text-sm text-muted">{t.type === "checklist" ? `${t.items.length} items` : `${t.target} ${t.unit}`}</span>
-              </label>
-            ))}
-            {derivedIds.length === 0 && <p className="text-sm text-danger">Select at least one, otherwise this card can never complete.</p>}
-            <p className="pt-1 text-xs text-muted">Numeric targets stop counting at 100%. Empty checklists don’t count as complete.</p>
-          </fieldset>
-        )}
-      </Group>
-
-      <Group title="Look & front of card">
+      <Disclosure title="Appearance" summary={`${coverSummary} · ${spec.density === "compact" ? "always compact" : "follows my view"}`}>
         <CoverPicker cover={spec.cover} onChange={(cover) => set({ cover })} />
         <div>
-          <p className="mb-1.5 text-sm font-medium text-muted">Accent colour</p>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Accent colour">
+          <p className="mb-1.5 text-sm font-medium text-muted">Card colour</p>
+          <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Card colour">
             {ACCENTS.map((c) => (
-              <button key={c} type="button" role="radio" aria-checked={spec.accent === c} aria-label={`Accent ${c}`} onClick={() => set({ accent: c })} className={clsx("size-9 rounded-full border-2", spec.accent === c ? "border-ivory" : "border-transparent")} style={{ background: c }} />
+              <button key={c} type="button" role="radio" aria-checked={resolveAccent(spec.accent).toLowerCase() === c} aria-label={`Colour ${c}`} onClick={() => set({ accent: c })} className="grid size-11 place-items-center rounded-full">
+                <span className={clsx("grid size-8 place-items-center rounded-full border-2", resolveAccent(spec.accent).toLowerCase() === c ? "border-fg" : "border-transparent")} style={{ background: c }}>{resolveAccent(spec.accent).toLowerCase() === c && <Check size={14} strokeWidth={3} className="text-accent-ink" />}</span>
+              </button>
             ))}
           </div>
         </div>
         <div>
-          <p className="mb-1.5 text-sm font-medium text-muted">Display</p>
-          <Segmented label="Display density" value={spec.density} onChange={(density) => set({ density })} options={[{ value: "comfortable", label: "Comfortable" }, { value: "compact", label: "Compact" }]} />
+          <p className="mb-1.5 text-sm font-medium text-muted">Card size</p>
+          <Segmented label="Card size" value={spec.density === "compact" ? "compact" : "follow"} onChange={(v) => set({ density: v === "compact" ? "compact" : "comfortable" })} options={[{ value: "follow", label: "Follow my view" }, { value: "compact", label: "Always compact" }]} />
         </div>
         <fieldset>
           <legend className="mb-1 text-sm font-medium text-muted">Show on the front</legend>
-          {(
-            [
-              ["showTime", "Time"],
-              ["showSummary", "Summary"],
-              ["showProgress", "Progress"],
-            ] as const
-          ).map(([k, label]) => (
-            <label key={k} className="flex min-h-10 items-center gap-3">
-              <input type="checkbox" className="size-5 accent-[var(--color-amber)]" checked={spec.front[k]} onChange={(e) => set({ front: { ...spec.front, [k]: e.target.checked } })} />
+          {([["showTime", "Time"], ["showSummary", "Summary"], ["showProgress", "Progress"]] as const).map(([k, label]) => (
+            <label key={k} className="flex min-h-11 items-center gap-3">
+              <input type="checkbox" className="size-5 accent-[var(--color-accent)]" checked={spec.front[k]} onChange={(e) => set({ front: { ...spec.front, [k]: e.target.checked } })} />
               {label}
             </label>
           ))}
         </fieldset>
-      </Group>
+      </Disclosure>
+
+      <Disclosure title="Completion behavior" summary={completionSummary}>
+        <div className="flex flex-wrap items-center">
+          <Segmented
+            label="Completion rule"
+            value={spec.completion.mode}
+            onChange={(m) => set({ completion: m === "manual" ? { mode: "manual" } : { mode: "derived", blockIds: derivedIds.length ? derivedIds : tracking.map((t) => t.id) } })}
+            options={[{ value: "manual", label: "I mark it done" }, { value: "derived", label: "From checklists & targets" }]}
+          />
+          <Help label="About completion rules">“I mark it done”: only you complete the card; lists and targets just show progress. “From checklists &amp; targets”: it completes when every selected list is fully ticked and every target is reached. Notes alone never complete a card. Bars stop at 100%.</Help>
+        </div>
+        {spec.completion.mode === "derived" &&
+          (tracking.length === 0 ? (
+            <p className="rounded-lg border border-line bg-surface-2 p-3 text-[15px]">Add a checklist or numeric target first — until then this card can’t complete.</p>
+          ) : (
+            <fieldset className="space-y-0.5">
+              <legend className="mb-1 text-sm text-muted">Done when all of these are complete:</legend>
+              {tracking.map((t) => (
+                <label key={t.id} className="flex min-h-11 items-center gap-3">
+                  <input type="checkbox" className="size-5 accent-[var(--color-accent)]" checked={derivedIds.includes(t.id)} onChange={(e) => set({ completion: { mode: "derived", blockIds: e.target.checked ? [...derivedIds, t.id] : derivedIds.filter((x) => x !== t.id) } })} />
+                  <span>{t.title || BLOCK_META[t.type].label}</span>
+                  <span className="text-sm text-muted">{t.type === "checklist" ? `${t.items.length} items` : `${t.target} ${t.unit}`}</span>
+                </label>
+              ))}
+              {derivedIds.length === 0 && <p className="text-[15px] text-danger">Select at least one, or this card can never complete.</p>}
+            </fieldset>
+          ))}
+      </Disclosure>
     </div>
   );
 }
 
 function CoverPicker({ cover, onChange }: { cover: Cover; onChange: (c: Cover) => void }) {
   const id = useId();
-  const tile = (active: boolean) => clsx("relative h-14 overflow-hidden rounded-xl border-2 text-xs", active ? "border-amber" : "border-line");
+  const tile = (active: boolean) => clsx("relative h-14 overflow-hidden rounded-xl border-2 text-sm", active ? "border-accent" : "border-line");
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium text-muted">Cover</p>
@@ -175,11 +211,16 @@ function CoverPicker({ cover, onChange }: { cover: Cover; onChange: (c: Cover) =
       </div>
       <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Plain colour covers">
         <span className="text-sm text-muted">Plain colour</span>
-        {COVER_COLORS.map((c) => (
-          <button key={c} type="button" role="radio" aria-checked={cover.kind === "color" && cover.color === c} aria-label={`Colour ${c}`} onClick={() => onChange({ kind: "color", color: c })} className={clsx("size-8 rounded-full border-2", cover.kind === "color" && cover.color === c ? "border-ivory" : "border-line")} style={{ background: c }} />
-        ))}
+        {COVER_COLORS.map((c) => {
+          const on = cover.kind === "color" && cover.color === c;
+          return (
+            <button key={c} type="button" role="radio" aria-checked={on} aria-label={`Colour ${c}`} onClick={() => onChange({ kind: "color", color: c })} className="grid size-11 place-items-center rounded-full">
+              <span className={clsx("grid size-8 place-items-center rounded-full border-2", on ? "border-fg" : "border-line")} style={{ background: c }}>{on && <Check size={14} strokeWidth={3} className="text-fg" />}</span>
+            </button>
+          );
+        })}
       </div>
-      <Field label="Or an image URL" htmlFor={`${id}-url`} hint="If the image can’t load, the card falls back to its accent tint.">
+      <Field label="Or a photo URL" htmlFor={`${id}-url`} hint="If it can’t load, the card falls back to a plain surface.">
         <input id={`${id}-url`} className={inputCls} inputMode="url" placeholder="https://…" value={cover.kind === "url" ? cover.url : ""} onChange={(e) => onChange(e.target.value.trim() ? { kind: "url", url: e.target.value.trim() } : { kind: "none" })} />
       </Field>
     </div>
@@ -193,10 +234,10 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
     return (
       <div className="space-y-2">
         {block.items.map((it, i) => (
-          <div key={it.id} className="flex items-center gap-1">
+          <div key={it.id} className="flex flex-wrap items-center gap-1">
             <input
               aria-label={`Item ${i + 1}`}
-              className={clsx(inputCls, "min-h-10")}
+              className={clsx(inputCls, "min-w-[11rem] flex-1")}
               value={it.text}
               onChange={(e) => setItems(block.items.map((x) => (x.id === it.id ? { ...x, text: e.target.value } : x)))}
               onKeyDown={(e) => {
@@ -211,16 +252,16 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
               }}
               data-item={it.id}
             />
-            <IconButton label={`Move item ${i + 1} up`} variant="ghost" className="size-10" disabled={i === 0} onClick={() => { const a = [...block.items]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; setItems(a); }}><ArrowUp size={14} /></IconButton>
-            <IconButton label={`Move item ${i + 1} down`} variant="ghost" className="size-10" disabled={i === block.items.length - 1} onClick={() => { const a = [...block.items]; [a[i + 1], a[i]] = [a[i], a[i + 1]]; setItems(a); }}><ArrowDown size={14} /></IconButton>
-            <IconButton label={`Remove item ${i + 1}`} variant="ghost" className="size-10 text-danger" onClick={() => setItems(block.items.filter((x) => x.id !== it.id))}><X size={14} /></IconButton>
+            <span className="ml-auto flex"><IconButton label={`Move item ${i + 1} up`} variant="ghost" disabled={i === 0} onClick={() => { const a = [...block.items]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; setItems(a); }}><ArrowUp size={14} /></IconButton>
+            <IconButton label={`Move item ${i + 1} down`} variant="ghost" disabled={i === block.items.length - 1} onClick={() => { const a = [...block.items]; [a[i + 1], a[i]] = [a[i], a[i + 1]]; setItems(a); }}><ArrowDown size={14} /></IconButton>
+            <IconButton label={`Remove item ${i + 1}`} variant="ghost" className="text-danger" onClick={() => setItems(block.items.filter((x) => x.id !== it.id))}><X size={14} /></IconButton></span>
           </div>
         ))}
         <div className="flex flex-wrap items-center gap-2">
           <Button small onClick={() => setItems([...block.items, { id: uid(), text: "" }])}><Plus size={14} aria-hidden /> Add item</Button>
           <label className="ml-auto flex items-center gap-2 text-sm text-muted">
             Called
-            <input aria-label="What items are called (plural)" className={clsx(inputCls, "min-h-9 w-28 text-sm")} value={block.noun ?? ""} placeholder="items" onChange={(e) => onChange({ ...block, noun: e.target.value || undefined })} />
+            <input aria-label="What items are called (plural)" className={clsx(inputCls, "w-28 text-sm")} value={block.noun ?? ""} placeholder="items" onChange={(e) => onChange({ ...block, noun: e.target.value || undefined })} />
           </label>
         </div>
       </div>
@@ -242,11 +283,11 @@ function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => 
     );
   return (
     <div className="space-y-2">
-      <p className="text-xs text-muted">Name the jobs here; pick who does each one on the card once it’s shared with a group.</p>
+      <p className="text-sm text-muted">Name the jobs; assign people on the card once it’s shared.</p>
       {block.assignments.map((a, i) => (
         <div key={a.id} className="flex items-center gap-1">
-          <input aria-label={`Responsibility ${i + 1}`} className={clsx(inputCls, "min-h-10")} value={a.label} placeholder="e.g. Cooking" onChange={(e) => onChange({ ...block, assignments: block.assignments.map((x) => (x.id === a.id ? { ...x, label: e.target.value } : x)) })} />
-          <IconButton label={`Remove responsibility ${i + 1}`} variant="ghost" className="size-10 text-danger" onClick={() => onChange({ ...block, assignments: block.assignments.filter((x) => x.id !== a.id) })}><X size={14} /></IconButton>
+          <input aria-label={`Responsibility ${i + 1}`} className={inputCls} value={a.label} placeholder="e.g. Cooking" onChange={(e) => onChange({ ...block, assignments: block.assignments.map((x) => (x.id === a.id ? { ...x, label: e.target.value } : x)) })} />
+          <IconButton label={`Remove responsibility ${i + 1}`} variant="ghost" className="text-danger" onClick={() => onChange({ ...block, assignments: block.assignments.filter((x) => x.id !== a.id) })}><X size={14} /></IconButton>
         </div>
       ))}
       <Button small onClick={() => onChange({ ...block, assignments: [...block.assignments, { id: uid(), label: "", userId: null }] })}><Plus size={14} aria-hidden /> Add responsibility</Button>
@@ -277,9 +318,9 @@ function NoteEditor({ value, onChange }: { value: string; onChange: (v: string) 
   return (
     <div>
       <div className="mb-1 flex gap-1" role="toolbar" aria-label="Text formatting">
-        <IconButton label="Bold" variant="ghost" className="size-9" onClick={() => wrap("**")}><Bold size={15} /></IconButton>
-        <IconButton label="Italic" variant="ghost" className="size-9" onClick={() => wrap("*")}><Italic size={15} /></IconButton>
-        <IconButton label="Bulleted list" variant="ghost" className="size-9" onClick={bullet}><List size={15} /></IconButton>
+        <IconButton label="Bold" variant="ghost" onClick={() => wrap("**")}><Bold size={15} /></IconButton>
+        <IconButton label="Italic" variant="ghost" onClick={() => wrap("*")}><Italic size={15} /></IconButton>
+        <IconButton label="Bulleted list" variant="ghost" onClick={bullet}><List size={15} /></IconButton>
         <span className="ml-auto self-center text-xs text-muted">**bold** · *italic* · - list</span>
       </div>
       <textarea ref={ref} rows={4} aria-label="Note text" className={clsx(inputCls, "py-2")} value={value} onChange={(e) => onChange(e.target.value)} />
@@ -287,4 +328,3 @@ function NoteEditor({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
-void CheckSquare;

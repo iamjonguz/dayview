@@ -1,6 +1,6 @@
 # Dayview
 
-A calm, mobile-first planner built from flippable, customizable cards. Next.js 16 · TypeScript · Tailwind 4 · Radix primitives · Supabase (optional).
+A calm, mobile-first planner built from customizable activity cards. Next.js 16 · TypeScript · Tailwind 4 · Radix primitives · Supabase (optional).
 
 ## Run it
 
@@ -39,10 +39,19 @@ Authorization is row-level security: private cards are owner-only; group cards a
 - `npm test`: 50 tests — recurrence/DST/timezone, no duplicate instances (concurrent loads), skip, progress rules (notes-only never complete, clamp at 100%), historical isolation, shared vs individual completion, independent personal ordering/hiding, stale-edit detection, invitations, and **the real SQL migration run in an in-process Postgres (PGlite) with RLS exercised as owner/editor/viewer/outsider/anonymous**.
 - Manually in a browser: phone-width (390px) and desktop layouts, complete / flip / add / persistence after reload, single card face in the DOM with focus moved to the new control.
 
+## Design system
+
+Colours live only as semantic tokens in `src/app/globals.css` (`bg`, `nav`, `surface`, `surface-2`, `line`, `fg`, `muted`, `accent`, `accent-ink`, `danger`, `focus`); components never use raw colours. Focus uses its own blue ring so it can't be mistaken for "selected" (sage). Branding is in `src/lib/brand.ts` (override the name with `NEXT_PUBLIC_APP_NAME`). Serif is used only for page titles.
+
+Card size: each person has a day-view preference (Compact / Comfortable, saved in their preferences; new accounts default to Compact). A card set to "always compact" stays compact, and a per-card choice from the card menu wins over both. Existing preferences are never rewritten. Cards saved with the old default amber accent follow the theme accent; any deliberately chosen colour is kept. Built-in covers are neutral gradients (old preset ids still resolve); use a photo URL for real imagery.
+
+Screenshots: `docs/screenshots/`.
+
 ## Limitations / not done
 
 - **Not tested against a live Supabase project** (no credentials here). The SQL/RLS is tested in PGlite; `SupabaseRepo`, auth UI and realtime are type-checked only.
 - Invitation delivery is in-app only (no emails are sent): invitees see it after signing in with the invited address.
 - Recurring routines are personal; share an individual day's card instead.
 - Covers are built-in illustrations, a plain colour, or an image URL (no uploads).
+- Software-keyboard behaviour is configured (`interactive-widget=resizes-content`, full-screen editor with a sticky Save bar) but was not tested on a real phone. Reduced-motion is implemented in CSS but was not exercised in a browser.
 - Drag-and-drop is in "Arrange" mode (handle + keyboard); up/down buttons and section menus work without dragging. Not exhaustively screen-reader tested.

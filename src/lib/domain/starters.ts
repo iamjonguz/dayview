@@ -41,6 +41,7 @@ export function starterTemplates(): CardTemplate[] {
         time: "09:00",
         endTime: "17:00",
         cover: { kind: "preset", id: "desk" },
+        summarySource: { kind: "next-item", blockId: workTasks.id },
         blocks: [workTasks, newBlock.note("Notes", "")],
       }),
     ),
@@ -53,6 +54,7 @@ export function starterTemplates(): CardTemplate[] {
         summary: "Baked salmon with rice and broccoli",
         time: "18:30",
         cover: { kind: "preset", id: "plate" },
+        front: { showTime: true, showSummary: true, showProgress: false }, // ingredients are incidental
         blocks: [
           newBlock.note("Tonight’s plan", "Baked salmon with rice and broccoli."),
           dinnerChecklist,
@@ -82,6 +84,7 @@ export function starterTemplates(): CardTemplate[] {
         summary: "20 pages",
         time: "21:00",
         cover: { kind: "preset", id: "book" },
+        summarySource: { kind: "progress", blockId: reading.id },
         completion: { mode: "derived", blockIds: [reading.id] },
         blocks: [newBlock.note("Book notes", "Currently reading: …"), reading],
       }),

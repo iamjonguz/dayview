@@ -7,7 +7,19 @@ export type EditorTarget =
   | { kind: "edit"; instanceId: ID }
   | null;
 
+const COLLAPSE_KEY = "dayview.view.collapseDone";
+const readBool = (k: string) => {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem(k) === "1";
+  } catch {
+    return false;
+  }
+};
+
 interface UiState {
+  /** Group completed cards into a collapsed "Done" section (persisted per device). */
+  collapseDone: boolean;
+  setCollapseDone(b: boolean): void;
   editor: EditorTarget;
   searchOpen: boolean;
   setSearchOpen(o: boolean): void;
@@ -16,6 +28,13 @@ interface UiState {
   closeEditor(): void;
 }
 export const useUi = create<UiState>((set) => ({
+  collapseDone: readBool(COLLAPSE_KEY),
+  setCollapseDone: (collapseDone) => {
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapseDone ? "1" : "0");
+    } catch {}
+    set({ collapseDone });
+  },
   editor: null,
   searchOpen: false,
   setSearchOpen: (searchOpen) => set({ searchOpen }),

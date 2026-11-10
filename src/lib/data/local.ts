@@ -85,7 +85,7 @@ function freshDb(timezone: string): LocalDB {
       { id: "demo-erik", name: "Erik", email: "erik@demo.local", demo: true },
     ],
     prefs: Object.fromEntries(
-      [DEMO_ME, "demo-maja", "demo-erik"].map((id) => [id, { timezone, defaultDensity: "comfortable" as const }]),
+      [DEMO_ME, "demo-maja", "demo-erik"].map((id) => [id, { timezone, defaultDensity: "compact" as const }]),
     ),
     sections: Object.fromEntries([DEMO_ME, "demo-maja", "demo-erik"].map((id) => [id, defaultSections()])),
     templates: [],

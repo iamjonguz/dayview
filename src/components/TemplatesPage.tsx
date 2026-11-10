@@ -41,14 +41,14 @@ export function TemplatesPage() {
       <PageHeader title="Templates" subtitle="Reusable pieces. Changing them shapes future days — what already happened stays as it was." />
       <div role="tablist" aria-label="Template types" className="mb-5 flex gap-1 rounded-2xl border border-line bg-surface p-1">
         {tabs.map(([k, l]) => (
-          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`min-h-11 flex-1 rounded-xl px-2 text-[15px] ${tab === k ? "bg-amber font-semibold text-amber-ink" : "hover:bg-surface-2"}`}>{l}</button>
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`min-h-11 flex-1 rounded-xl px-2 text-[15px] ${tab === k ? "bg-accent font-semibold text-accent-ink" : "hover:bg-surface-2"}`}>{l}</button>
         ))}
       </div>
 
       {tab === "routines" && (
         <section aria-label="Routines" className="space-y-3">
           <p className="text-sm text-muted">Routines create a card on each scheduled day. Add one by choosing “Repeat” when you create a card.</p>
-          {active.length === 0 && <p className="rounded-3xl border border-dashed border-line p-8 text-center text-muted">No routines yet.</p>}
+          {active.length === 0 && <p className="rounded-2xl border border-dashed border-line p-8 text-center text-muted">No routines yet.</p>}
           {active.map((s) => (
             <Row key={s.id} title={s.spec.title} meta={`${describeRule(s.rule)}${s.spec.time ? " · " + formatTimeRange(s.spec.time, s.spec.endTime) : ""} · since ${s.rule.start}`}>
               <Button small onClick={() => setRoutine(s)}><Pencil size={14} aria-hidden /> Edit</Button>
@@ -79,7 +79,7 @@ export function TemplatesPage() {
       {tab === "layouts" && (
         <section aria-label="Day layouts" className="space-y-3">
           <div className="flex flex-wrap justify-end gap-2"><Button onClick={() => setApplying(true)}>Apply to {date === today ? "today" : date}</Button><Button variant="primary" onClick={() => setSaving(true)}>Save {date === today ? "today" : date} as layout</Button></div>
-          {ws.layouts.length === 0 && <p className="rounded-3xl border border-dashed border-line p-8 text-center text-muted">No layouts yet. Set up a day you like, then save it — for example one for weekdays and one for weekends.</p>}
+          {ws.layouts.length === 0 && <p className="rounded-2xl border border-dashed border-line p-8 text-center text-muted">No layouts yet. Set up a day you like, then save it — for example one for weekdays and one for weekends.</p>}
           {ws.layouts.map((l) => (
             <Row key={l.id} title={l.name} meta={`${l.entries.length} cards${l.autoApply.length ? " · auto on " + l.autoApply.map((d) => WEEKDAY_SHORT[d]).join(", ") : ""}`}>
               <Button small onClick={() => setLayout(l)}><Pencil size={14} aria-hidden /> Edit</Button>
@@ -105,7 +105,7 @@ function Row({ title, meta, badge, children }: { title: string; meta: string; ba
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-4">
       <div className="min-w-0">
-        <p className="flex items-center gap-2 font-serif text-xl">{title}{badge && <span className="rounded-full bg-surface-2 px-2 py-0.5 font-sans text-xs text-muted">{badge}</span>}</p>
+        <p className="flex items-center gap-2 font-semibold text-xl">{title}{badge && <span className="rounded-full bg-surface-2 px-2 py-0.5 font-sans text-xs text-muted">{badge}</span>}</p>
         <p className="text-sm text-muted">{meta}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
@@ -121,7 +121,7 @@ function RoutineSheet({ series, today, onClose }: { series: Series; today: strin
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()} wide title="Edit routine" description={`Applies from ${from} onwards. Earlier days keep exactly what was recorded.`}
       footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!spec.title.trim() || (rep.kind === "weekdays" && rep.weekdays.length === 0)} onClick={async () => { const r = await act((p) => p.editRoutine(series, spec, repeatToRule(rep)!, today), { done: "Routine updated from today" }); if (r.ok) onClose(); }}>Save from {from}</Button></>}>
-      <div className="space-y-8"><SpecEditor spec={spec} onChange={setSpec} /><section className="space-y-3"><h3 className="font-serif text-xl">Repeat</h3><RepeatEditor value={rep} onChange={setRep} allowOnce={false} /></section></div>
+      <div className="space-y-8"><SpecEditor spec={spec} onChange={setSpec} /><section className="space-y-3"><h3 className="font-semibold text-xl">Repeat</h3><RepeatEditor value={rep} onChange={setRep} allowOnce={false} /></section></div>
     </Sheet>
   );
 }

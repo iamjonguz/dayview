@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { BRAND } from "@/lib/brand";
 import { getSupabase } from "@/lib/supabase/client";
 import { Button, Field, Segmented, inputCls } from "./ui";
 
@@ -28,10 +29,10 @@ export function AuthPanel() {
 
   return (
     <main className="grid min-h-dvh place-items-center p-4">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-3xl border border-line bg-surface p-6 shadow-2xl">
+      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl border border-line bg-surface p-6 shadow-lg">
         <div>
-          <h1 className="font-serif text-4xl text-amber">Dayview</h1>
-          <p className="mt-1 text-muted">A calm place for your day.</p>
+          <h1 className="font-serif text-4xl text-accent">{BRAND.name}</h1>
+          <p className="mt-1 text-muted">{BRAND.tagline}</p>
         </div>
         <Segmented label="Mode" value={mode} onChange={setMode} options={[{ value: "in", label: "Sign in" }, { value: "up", label: "Create account" }]} />
         {mode === "up" && <Field label="Name" htmlFor="n"><input id="n" className={inputCls} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></Field>}

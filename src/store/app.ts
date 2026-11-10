@@ -51,6 +51,7 @@ interface AppState {
   saveCard(inst: CardInstance, patch: { spec: CardSpec; groupId?: ID | null; completionMode?: CompletionMode; rule?: Omit<Recurrence, "start"> }, scope: EditScope): Promise<{ ok: boolean; conflict?: boolean }>;
   patchProgress(card: DayCard, patch: ProgressPatch): Promise<void>;
   reorder(layout: { sectionId: ID | null; ids: ID[] }[]): Promise<void>;
+  setViewDensity(d: "compact" | "comfortable"): Promise<void>;
   setDemoActor(id: ID): Promise<void>;
   resetDemo(): Promise<void>;
 }
@@ -289,6 +290,23 @@ export const useApp = create<AppState>((set, get) => {
       } catch {
         set({ data: prev, view: rebuild(prev) });
         get().toast("Couldn't save the new order. It was put back.", { kind: "error" });
+      }
+    },
+
+    /** The day-view size preference (persisted in the user's preferences). Optimistic. */
+    async setViewDensity(d) {
+      const { planner, ws, data } = get();
+      if (!planner || !ws || ws.prefs.defaultDensity === d) return;
+      const prev = ws.prefs;
+      const prefs = { ...prev, defaultDensity: d };
+      planner.ws = { ...planner.ws, prefs };
+      set({ ws: { ...ws, prefs }, view: data ? planner.view(data) : get().view });
+      try {
+        await planner.savePrefs(prefs);
+      } catch {
+        planner.ws = { ...planner.ws, prefs: prev };
+        set({ ws: { ...ws, prefs: prev }, view: data ? planner.view(data) : get().view });
+        get().toast("Couldn’t save your view preference.", { kind: "error" });
       }
     },
 

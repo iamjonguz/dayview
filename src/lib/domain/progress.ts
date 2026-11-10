@@ -89,3 +89,19 @@ export function pruneState(spec: CardSpec, state: ProgressState): ProgressState 
 
 export const hasAnyState = (s: ProgressState) =>
   s.completed || Object.values(s.checks).some(Boolean) || Object.values(s.values).some((v) => v > 0);
+
+/** The one-line summary shown on the card front: the user's text, the next unchecked item, or a block's progress. */
+export function resolveSummary(spec: CardSpec, state: ProgressState): string {
+  const src = spec.summarySource;
+  if (!src || src.kind === "text") return spec.summary;
+  const b = spec.blocks.find((x) => x.id === src.blockId);
+  if (!b) return spec.summary;
+  if (src.kind === "next-item" && b.type === "checklist") {
+    const next = b.items.find((i) => i.text.trim() && !state.checks[i.id]);
+    if (next) return `Next: ${next.text}`;
+    return b.items.length ? `All ${b.noun || "items"} ticked` : spec.summary;
+  }
+  if (src.kind === "progress" && b.type === "progress")
+    return `${fmtNum(state.values[b.id] ?? 0)} of ${fmtNum(b.target)}${b.unit ? ` ${b.unit}` : ""}`;
+  return spec.summary;
+}

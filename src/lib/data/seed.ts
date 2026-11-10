@@ -21,6 +21,7 @@ export async function seedDemo(p: Planner) {
   const workSpec: CardSpec = {
     ...work,
     summary: "Focus time",
+    summarySource: { kind: "next-item", blockId: workList.id },
     blocks: [workList, newBlock.note("Notes", "Send the draft before **15:00**.")],
   };
   const lunchList = newBlock.checklist("Plate", ["Soup", "Sourdough", "Fruit"], "items");

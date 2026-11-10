@@ -5,7 +5,10 @@ export const uid = (): ID =>
     ? crypto.randomUUID()
     : "id-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-export const ACCENTS = ["#e8a04c", "#d9775a", "#c9a227", "#7fa876", "#6fa3a8", "#8f8bd0", "#c47fa6"];
+/** The first accent is the theme's own sage. Cards saved with the old default amber follow the theme accent too (see resolveAccent). */
+export const ACCENTS = ["#b8cdaa", "#e0a458", "#e08f7c", "#8fb8c9", "#a9a3d8", "#d9a0bf", "#c9c77a"];
+export const LEGACY_DEFAULT_ACCENT = "#e8a04c";
+export const resolveAccent = (a: string) => (!a || a.toLowerCase() === LEGACY_DEFAULT_ACCENT ? ACCENTS[0] : a);
 
 export const newCardSpec = (over: Partial<CardSpec> = {}): CardSpec => ({
   title: "",
@@ -72,9 +75,13 @@ export function cloneSpec(spec: CardSpec, freshIds = true): CardSpec {
     if (b.type === "responsibility") return { ...b, id, assignments: b.assignments.map((a) => ({ ...a, id: nid(a.id) })) };
     return { ...b, id };
   });
+  const summarySource =
+    spec.summarySource && spec.summarySource.kind !== "text"
+      ? { ...spec.summarySource, blockId: idMap.get(spec.summarySource.blockId) ?? spec.summarySource.blockId }
+      : spec.summarySource;
   const completion =
     spec.completion.mode === "derived"
       ? { mode: "derived" as const, blockIds: spec.completion.blockIds.map((i) => idMap.get(i) ?? i) }
       : spec.completion;
-  return { ...spec, cover: { ...spec.cover }, front: { ...spec.front }, completion, blocks };
+  return { ...spec, summarySource, cover: { ...spec.cover }, front: { ...spec.front }, completion, blocks };
 }

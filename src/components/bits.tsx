@@ -4,7 +4,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { presetUri } from "@/lib/ui/covers";
 import type { Cover } from "@/lib/domain/types";
 
-export function ProgressBar({ fraction, label, accent = "var(--color-amber)", className }: { fraction: number; label?: string; accent?: string; className?: string }) {
+export function ProgressBar({ fraction, label, accent = "var(--color-accent)", className }: { fraction: number; label?: string; accent?: string; className?: string }) {
   const pct = Math.round(Math.max(0, Math.min(1, fraction)) * 100); // never beyond 100%
   return (
     <div
@@ -13,7 +13,7 @@ export function ProgressBar({ fraction, label, accent = "var(--color-amber)", cl
       aria-valuemax={100}
       aria-valuenow={pct}
       aria-label={label}
-      className={clsx("h-1.5 overflow-hidden rounded-full bg-white/20", className)}
+      className={clsx("h-1.5 overflow-hidden rounded-full bg-line", className)}
     >
       <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${pct}%`, background: accent }} />
     </div>
@@ -24,14 +24,15 @@ export function ProgressBar({ fraction, label, accent = "var(--color-amber)", cl
 export function CoverBackground({ cover, accent }: { cover: Cover; accent: string }) {
   const [failed, setFailed] = useState<string | null>(null);
   const url = cover.kind === "url" ? cover.url : cover.kind === "preset" ? presetUri(cover.id) : null;
-  if (cover.kind === "color") return <div aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${cover.color}, color-mix(in srgb, ${cover.color} 55%, #0f0c09))` }} />;
+  if (cover.kind === "color") return <div aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${cover.color}, color-mix(in srgb, ${cover.color} 60%, var(--color-bg)))` }} />;
   if (url && failed !== url)
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={url} alt="" aria-hidden loading="lazy" onError={() => setFailed(url)} className="absolute inset-0 size-full object-cover" />
     );
   // none or missing image: tasteful tint from the accent colour
-  return <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, ${accent} 26%, transparent), transparent 60%), linear-gradient(160deg, #2c261f, #221d18)` }} />;
+  // no image: a calm neutral surface with a faint hint of the card colour
+  return <div aria-hidden className="absolute inset-0 bg-surface" style={{ backgroundImage: `linear-gradient(120deg, transparent 55%, color-mix(in srgb, ${accent} 12%, transparent))` }} />;
 }
 export const hasImage = (c: Cover) => c.kind === "preset" || c.kind === "url" || c.kind === "color";
 
@@ -53,7 +54,7 @@ export function RichText({ text, className }: { text: string; className?: string
   const flush = (k: number) => {
     if (bullets.length) {
       nodes.push(
-        <ul key={`u${k}`} className="my-1 list-disc space-y-0.5 pl-5 marker:text-amber">
+        <ul key={`u${k}`} className="my-1 list-disc space-y-0.5 pl-5 marker:text-accent">
           {bullets.map((b, i) => <li key={i}>{inline(b)}</li>)}
         </ul>,
       );

@@ -88,10 +88,14 @@ export type Completion =
   /** Complete when every listed tracking block is complete. */
   | { mode: "derived"; blockIds: ID[] };
 
+/** Where the one-line summary on a card's front comes from. Absent = the text the user wrote. */
+export type SummarySource = { kind: "text" } | { kind: "next-item"; blockId: ID } | { kind: "progress"; blockId: ID };
+
 /** Everything that describes how a card looks and what it contains. Shared by templates, routines and dated cards. */
 export interface CardSpec {
   title: string;
   summary: string;
+  summarySource?: SummarySource;
   cover: Cover;
   accent: string;
   density: Density;

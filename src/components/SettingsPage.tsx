@@ -25,8 +25,8 @@ export function SettingsPage() {
     <Page>
       <PageHeader title="Settings" />
       <div className="space-y-6">
-        <section className="space-y-4 rounded-3xl border border-line bg-surface p-5">
-          <h2 className="font-serif text-2xl">Preferences</h2>
+        <section className="space-y-4 rounded-2xl border border-line bg-surface p-5">
+          <h2 className="text-lg font-semibold">Preferences</h2>
           <Field label="Timezone" htmlFor="tz" hint="“Today” and routine days follow this timezone.">
             <select id="tz" className={inputCls} value={ws.prefs.timezone} onChange={(e) => void act((p) => p.savePrefs({ ...ws.prefs, timezone: e.target.value }), { done: "Timezone updated" })}>
               {zones.map((z) => <option key={z}>{z}</option>)}
@@ -39,19 +39,19 @@ export function SettingsPage() {
           <Button onClick={() => setSections(true)}>Edit day sections…</Button>
         </section>
 
-        <section className="rounded-3xl border border-line bg-surface p-5">
-          <h2 className="font-serif text-2xl">How progress works</h2>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-[15px] text-muted marker:text-amber">
-            <li><strong className="text-ivory">I mark it done</strong>: the card is complete only when you complete it. Checklists and targets just show progress.</li>
-            <li><strong className="text-ivory">From checklists &amp; targets</strong>: complete when every selected checklist is fully ticked and every numeric target is reached.</li>
+        <section className="rounded-2xl border border-line bg-surface p-5">
+          <h2 className="text-lg font-semibold">How progress works</h2>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-[15px] text-muted marker:text-accent">
+            <li><strong className="text-fg">I mark it done</strong>: the card is complete only when you complete it. Checklists and targets just show progress.</li>
+            <li><strong className="text-fg">From checklists &amp; targets</strong>: complete when every selected checklist is fully ticked and every numeric target is reached.</li>
             <li>Notes-only cards are never completed automatically. Bars stop at 100% even if you go past a target.</li>
             <li>Skipping a day isn’t a failure — it’s just left out of the day’s count.</li>
           </ul>
         </section>
 
         {mode === "demo" ? (
-          <section className="space-y-4 rounded-3xl border border-amber/40 bg-amber/5 p-5">
-            <h2 className="font-serif text-2xl">Demo tools</h2>
+          <section className="space-y-4 rounded-2xl border border-line bg-surface p-5">
+            <h2 className="text-lg font-semibold">Demo tools</h2>
             <p className="text-[15px] text-muted">Everything is stored in this browser. Switch between the sample people to preview how shared cards look for each member — this is a local simulation, not real multi-user sharing.</p>
             <Field label="Viewing as" htmlFor="actor">
               <select id="actor" className={inputCls} value={ws.me.id} onChange={(e) => void setActor(e.target.value)}>
@@ -61,8 +61,8 @@ export function SettingsPage() {
             <Button variant="danger" onClick={() => setReset(true)}>Reset demo data…</Button>
           </section>
         ) : (
-          <section className="space-y-3 rounded-3xl border border-line bg-surface p-5">
-            <h2 className="font-serif text-2xl">Account</h2>
+          <section className="space-y-3 rounded-2xl border border-line bg-surface p-5">
+            <h2 className="text-lg font-semibold">Account</h2>
             <p className="text-muted">Signed in as {ws.me.email}</p>
             <Button onClick={() => void signOut()}>Sign out</Button>
           </section>

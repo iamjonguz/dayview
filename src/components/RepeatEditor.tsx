@@ -28,7 +28,7 @@ export function RepeatEditor({ value, onChange, startLabel, allowOnce = true }: 
           {[1, 2, 3, 4, 5, 6, 0].map((d) => {
             const on = value.weekdays.includes(d);
             return (
-              <button key={d} type="button" aria-pressed={on} onClick={() => onChange({ ...value, weekdays: on ? value.weekdays.filter((x) => x !== d) : [...value.weekdays, d] })} className={clsx("min-h-11 min-w-12 rounded-xl border px-2 text-sm", on ? "border-amber bg-amber text-amber-ink font-semibold" : "border-line hover:bg-surface-2")}>
+              <button key={d} type="button" aria-pressed={on} onClick={() => onChange({ ...value, weekdays: on ? value.weekdays.filter((x) => x !== d) : [...value.weekdays, d] })} className={clsx("min-h-11 min-w-12 rounded-xl border px-2 text-sm", on ? "border-accent bg-accent text-accent-ink font-semibold" : "border-line hover:bg-surface-2")}>
                 {WEEKDAY_SHORT[d]}
               </button>
             );
