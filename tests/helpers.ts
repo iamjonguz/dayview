@@ -1,4 +1,5 @@
 import { LocalRepo, memoryKV, DEMO_ME, DEMO_FAMILY } from "../src/lib/data/local";
+import { memoryImageStore } from "../src/lib/data/imageStore";
 import { Planner } from "../src/lib/data/planner";
 import { newBlock, newCardSpec } from "../src/lib/domain/factory";
 
@@ -8,11 +9,12 @@ export { DEMO_ME, DEMO_FAMILY };
 
 export function makeEnv() {
   const kv = memoryKV();
+  const images = memoryImageStore(); // one shared "bucket", like the browser's IndexedDB
   const planners = new Map<string, Planner>();
   async function as(userId: string) {
     let p = planners.get(userId);
     if (!p) {
-      const repo = new LocalRepo(kv, "Europe/Stockholm");
+      const repo = new LocalRepo(kv, "Europe/Stockholm", images);
       repo.actingUserId = userId;
       p = new Planner(repo, () => NOW);
       planners.set(userId, p);

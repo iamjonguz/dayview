@@ -74,10 +74,26 @@ const toPlacement = (r: Row): Placement => ({
  * Supabase-backed repository. Authorization is enforced by Postgres RLS (see supabase/migrations);
  * this class only translates between rows and domain objects. Requires a signed-in session.
  */
+export const IMAGE_BUCKET = "card-images";
+
 export class SupabaseRepo implements Repo {
   readonly mode = "supabase" as const;
   private userId!: ID;
   constructor(private sb: SupabaseClient) {}
+
+  /** Photos go in a private bucket under the uploader's id; reads use short-lived signed URLs (never public links). */
+  async putImage(blob: Blob): Promise<string> {
+    if (!this.userId) this.userId = (await this.sb.auth.getUser()).data.user?.id ?? "";
+    if (!this.userId) throw new Error("Not signed in");
+    const path = `${this.userId}/${uid()}.jpg`;
+    const { error } = await this.sb.storage.from(IMAGE_BUCKET).upload(path, blob, { contentType: "image/jpeg", cacheControl: "3600", upsert: false });
+    if (error) throw new Error(/bucket.*not found/i.test(error.message) ? "Photo storage isn’t set up yet (see the README: Photo storage)." : error.message);
+    return path;
+  }
+  async getImageUrl(path: string): Promise<string | null> {
+    const { data, error } = await this.sb.storage.from(IMAGE_BUCKET).createSignedUrl(path, 3600);
+    return error ? null : (data?.signedUrl ?? null);
+  }
 
   async load(): Promise<Workspace> {
     const { data: u, error } = await this.sb.auth.getUser();

@@ -7,6 +7,7 @@ import { LocalRepo } from "@/lib/data/local";
 import { addDays, formatShort, relativeLabel } from "@/lib/domain/dates";
 import { canManageGroup, roleIn, scopeFor } from "@/lib/domain/permissions";
 import { cardProgress, emptyState } from "@/lib/domain/progress";
+import { dayHref } from "@/lib/ui/links";
 import type { CardInstance, Group, ProgressRecord, Role } from "@/lib/domain/types";
 import { useApp } from "@/store/app";
 import { Page, PageHeader } from "./PageHeader";
@@ -18,7 +19,6 @@ export function GroupsPage() {
   const planner = useApp((s) => s.planner);
   const act = useApp((s) => s.act);
   const version = useApp((s) => s.data);
-  const setDate = useApp((s) => s.setDate);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [del, setDel] = useState<Group | null>(null);
@@ -73,10 +73,10 @@ export function GroupsPage() {
               const g = ws.groups.find((x) => x.id === i.groupId);
               return (
                 <li key={i.id}>
-                  <Link href="/" onClick={() => void setDate(i.date)} className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-surface-2">
-                    <span className={clsx("grid size-6 shrink-0 place-items-center rounded-full border-2", done ? "border-transparent bg-accent" : "border-muted")} aria-hidden>{done && <Check size={14} strokeWidth={3} className="text-accent-ink" />}</span>
+                  <Link href={dayHref(i.date, i.id)} className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-surface-2">
+                    <span className={clsx("grid size-6 shrink-0 place-items-center rounded-md border-2", done ? "border-done bg-done" : "border-muted")} aria-hidden>{done && <Check size={16} strokeWidth={3.5} className="text-done-ink" />}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">{i.spec.title}<span className="sr-only">{done ? ", complete" : ", not complete"}</span></span>
+                      <span className="block truncate font-semibold">{i.spec.title}<span className="sr-only">{done ? ", complete" : ", not complete"}. Open this activity on its day</span></span>
                       <span className="block truncate text-[15px] text-muted">{[relativeLabel(i.date, today) === "Upcoming" ? formatShort(i.date) : relativeLabel(i.date, today), i.spec.time, g?.name, i.completionMode === "together" ? "complete together" : "each person"].filter(Boolean).join(" · ")}</span>
                     </span>
                     <ChevronRight size={18} className="shrink-0 text-muted" aria-hidden />

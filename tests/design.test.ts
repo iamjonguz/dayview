@@ -58,6 +58,7 @@ describe("accent colours", () => {
     expect(resolveAccent("#e8a04c")).toBe(ACCENTS[0]);
     expect(resolveAccent("#E8A04C")).toBe(ACCENTS[0]);
     expect(resolveAccent("#8fb8c9")).toBe("#8fb8c9");
-    expect(ACCENTS).toContain("#e0a458"); // amber remains a selectable colour, distinct from the legacy default
+    expect(resolveAccent("#b8cdaa")).toBe(ACCENTS[0]); // the previous sage default also follows the theme
+    expect(resolveAccent("")).toBe(ACCENTS[0]);
   });
 });

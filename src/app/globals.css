@@ -2,19 +2,22 @@
 
 /* ---------------------------------------------------------------------------
    Design tokens. Components use only these semantic names — never raw colours.
-   Neutral charcoal surfaces, soft-white text, one restrained sage accent.
+   Neutral dark ground, clearly lifted cards, soft coral for actions/selection,
+   mint reserved for completion. Contrast ratios are checked in tests/design.test.ts.
    --------------------------------------------------------------------------- */
 @theme inline {
-  --color-bg: #17191b; /* app background */
-  --color-nav: #121416; /* navigation surfaces */
-  --color-surface: #222629; /* cards, panels */
-  --color-surface-2: #2b3034; /* elevated / hover */
-  --color-line: #3b4246; /* subtle borders */
-  --color-fg: #f2f3ef; /* primary text */
-  --color-muted: #b4bcb7; /* secondary text (≥ 7:1 on surface) */
-  --color-accent: #b8cdaa; /* primary actions, active nav, selected */
-  --color-accent-ink: #172016; /* text on accent */
-  --color-danger: #f29b90; /* destructive text/borders (≥ 6:1 on surface) */
+  --color-bg: #17191d; /* app background */
+  --color-nav: #121418; /* navigation surfaces */
+  --color-surface: #252a32; /* cards, panels */
+  --color-surface-2: #313744; /* elevated: menus, hover, selected rows */
+  --color-line: #3d4452; /* borders */
+  --color-fg: #f4f5f7; /* primary text */
+  --color-muted: #b8c0cc; /* secondary text */
+  --color-accent: #ff9b82; /* primary actions, selection, active nav */
+  --color-accent-ink: #231714; /* text on accent */
+  --color-done: #95d6b2; /* completion + positive progress */
+  --color-done-ink: #0f2418; /* text on done */
+  --color-danger: #ff8493; /* destructive text/borders */
   --color-focus: #8cc4ff; /* keyboard focus ring: distinct from accent */
   --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-display), "Iowan Old Style", Georgia, serif;
@@ -22,7 +25,8 @@
 
 :root {
   color-scheme: dark;
-  --scrim-solid: #222629; /* matches --color-surface; used for text areas over images */
+  --scrim-solid: #252a32; /* matches --color-surface; used for text areas over images */
+  --scrim-rgb: 37 42 50;
   --nav-h: 4rem;
 }
 
@@ -70,10 +74,10 @@ body {
 
 /* text sits on a solid area; the image only shows beside it (localized gradient, no full-card tint) */
 .cover-fade {
-  background: linear-gradient(90deg, var(--scrim-solid) 0%, var(--scrim-solid) 48%, rgb(34 38 41 / 0.55) 72%, transparent 100%);
+  background: linear-gradient(90deg, var(--scrim-solid) 0%, var(--scrim-solid) 48%, rgb(var(--scrim-rgb) / 0.5) 74%, transparent 100%);
 }
 .cover-fade-bottom {
-  background: linear-gradient(to top, var(--scrim-solid) 0%, var(--scrim-solid) 34%, rgb(34 38 41 / 0.6) 62%, transparent 100%);
+  background: linear-gradient(to top, var(--scrim-solid) 0%, var(--scrim-solid) 34%, rgb(var(--scrim-rgb) / 0.55) 62%, transparent 100%);
 }
 
 /* details/summary: hide default marker consistently */

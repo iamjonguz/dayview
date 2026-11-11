@@ -46,28 +46,39 @@ export interface CardProgress {
   complete: boolean;
   /** Short human label like "2 of 5 tasks" or "20 of 30 min". Empty if nothing to track. */
   label: string;
+  /** What the front of the card shows. Equals the fields above unless the card picks specific tracking blocks. */
+  front: { has: boolean; fraction: number; label: string };
+}
+
+function summarise(blocks: TrackingBlock[], state: ProgressState): { fraction: number; label: string } {
+  const fraction = Math.min(1, blocks.reduce((s, b) => s + blockFraction(b, state), 0) / blocks.length);
+  if (blocks.length > 1) return { fraction, label: `${blocks.filter((b) => blockComplete(b, state)).length} of ${blocks.length} parts` };
+  const b = blocks[0];
+  if (b.type === "checklist") {
+    const done = b.items.filter((i) => state.checks[i.id]).length;
+    return { fraction, label: `${done} of ${b.items.length} ${b.noun || (b.items.length === 1 ? "item" : "items")}` };
+  }
+  return { fraction, label: `${fmtNum(state.values[b.id] ?? 0)} of ${fmtNum(b.target)}${b.unit ? ` ${b.unit}` : ""}` };
+}
+
+/** Tracking blocks shown in the front summary: the card's own pick when set (and still valid), otherwise the relevant ones. */
+export function frontBlocks(spec: CardSpec): TrackingBlock[] {
+  const ids = spec.front.progressBlockIds;
+  if (ids) {
+    const set = new Set(ids);
+    return trackingBlocks(spec).filter((b) => set.has(b.id));
+  }
+  return relevantBlocks(spec);
 }
 
 export function cardProgress(spec: CardSpec, state: ProgressState): CardProgress {
   const blocks = relevantBlocks(spec);
   const derived = spec.completion.mode === "derived";
   const complete = derived ? blocks.length > 0 && blocks.every((b) => blockComplete(b, state)) : state.completed;
-  if (blocks.length === 0) return { hasTracking: false, fraction: 0, complete, label: "" };
-  const fraction = Math.min(1, blocks.reduce((s, b) => s + blockFraction(b, state), 0) / blocks.length);
-  let label: string;
-  if (blocks.length === 1) {
-    const b = blocks[0];
-    if (b.type === "checklist") {
-      const done = b.items.filter((i) => state.checks[i.id]).length;
-      label = `${done} of ${b.items.length} ${b.noun || (b.items.length === 1 ? "item" : "items")}`;
-    } else {
-      label = `${fmtNum(state.values[b.id] ?? 0)} of ${fmtNum(b.target)}${b.unit ? ` ${b.unit}` : ""}`;
-    }
-  } else {
-    const done = blocks.filter((b) => blockComplete(b, state)).length;
-    label = `${done} of ${blocks.length} parts`;
-  }
-  return { hasTracking: true, fraction, complete, label };
+  const shown = frontBlocks(spec);
+  const front = shown.length ? { has: true, ...summarise(shown, state) } : { has: false, fraction: 0, label: "" };
+  if (blocks.length === 0) return { hasTracking: false, fraction: 0, complete, label: "", front };
+  return { hasTracking: true, complete, ...summarise(blocks, state), front };
 }
 
 export const fmtNum = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100));
@@ -90,6 +101,10 @@ export function pruneState(spec: CardSpec, state: ProgressState): ProgressState 
 export const hasAnyState = (s: ProgressState) =>
   s.completed || Object.values(s.checks).some(Boolean) || Object.values(s.values).some((v) => v > 0);
 
+/** First meaningful line of a note, without the bullet/bold/italic mini-format. */
+export const firstLine = (text: string) =>
+  (text.split("\n").map((l) => l.replace(/^\s*[-•]\s+/, "").replace(/\*\*?/g, "").trim()).find(Boolean) ?? "").replace(/[.]$/, "");
+
 /** The one-line summary shown on the card front: the user's text, the next unchecked item, or a block's progress. */
 export function resolveSummary(spec: CardSpec, state: ProgressState): string {
   const src = spec.summarySource;
@@ -101,6 +116,7 @@ export function resolveSummary(spec: CardSpec, state: ProgressState): string {
     if (next) return `Next: ${next.text}`;
     return b.items.length ? `All ${b.noun || "items"} ticked` : spec.summary;
   }
+  if (src.kind === "note" && b.type === "note") return firstLine(b.text) || spec.summary;
   if (src.kind === "progress" && b.type === "progress")
     return `${fmtNum(state.values[b.id] ?? 0)} of ${fmtNum(b.target)}${b.unit ? ` ${b.unit}` : ""}`;
   return spec.summary;

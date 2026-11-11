@@ -6,6 +6,8 @@ export type TimeStr = string;
 
 export type Role = "owner" | "editor" | "viewer";
 export type Density = "compact" | "comfortable";
+/** How one card is drawn today. */
+export type Presentation = Density | "cover";
 export type CompletionMode = "together" | "individual";
 
 export interface Profile {
@@ -75,12 +77,23 @@ export type Cover =
   | { kind: "none" }
   | { kind: "preset"; id: string }
   | { kind: "url"; url: string }
+  /** A photo the person uploaded. `path` is "<uploader id>/<image id>.jpg" in private image storage. */
+  | { kind: "upload"; path: string }
   | { kind: "color"; color: string };
 
 export interface FrontConfig {
   showTime: boolean;
   showSummary: boolean;
   showProgress: boolean;
+  /** Shared cards: show the group (and, if chosen, one person) on the front. Absent = on. */
+  showPeople?: boolean;
+  /** The one responsibility to feature next to the group name. Absent = group name only (never guessed). */
+  personAssignmentId?: ID;
+  /**
+   * Which tracking blocks feed the front-of-card progress line. Absent = every tracking block the completion rule uses.
+   * Purely presentational: it never changes whether the card is complete.
+   */
+  progressBlockIds?: ID[];
 }
 
 export type Completion =
@@ -89,15 +102,30 @@ export type Completion =
   | { mode: "derived"; blockIds: ID[] };
 
 /** Where the one-line summary on a card's front comes from. Absent = the text the user wrote. */
-export type SummarySource = { kind: "text" } | { kind: "next-item"; blockId: ID } | { kind: "progress"; blockId: ID };
+export type SummarySource = { kind: "text" } | { kind: "next-item"; blockId: ID } | { kind: "progress"; blockId: ID } | { kind: "note"; blockId: ID };
+
+/** Where the cover is looking: a focal point (0–1 of the image) and a zoom (≥ 1), shared by every presentation. */
+export interface Focus {
+  x: number;
+  y: number;
+  zoom: number;
+}
 
 /** Everything that describes how a card looks and what it contains. Shared by templates, routines and dated cards. */
 export interface CardSpec {
   title: string;
   summary: string;
   summarySource?: SummarySource;
+  /** Optional short detail shown before the summary: a project, route, book title… */
+  context?: string;
+  /** Framing of the cover image. Absent = centred. */
+  focus?: Focus;
+  /** "cover" = larger photographic card. Absent = follow `density`. */
+  style?: "cover";
   cover: Cover;
   accent: string;
+  /** Activity icon key (see lib/ui/activity.ts). Absent = chosen from the title. */
+  icon?: string;
   density: Density;
   time?: TimeStr;
   endTime?: TimeStr;

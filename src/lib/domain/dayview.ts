@@ -8,6 +8,7 @@ import type {
   ID,
   Member,
   Placement,
+  Presentation,
   ProgressRecord,
   ProgressState,
   Section,
@@ -23,6 +24,8 @@ export interface DayCard {
   /** Front-of-card summary (written text, next checklist item, or a block's progress). */
   summary: string;
   density: Density;
+  /** How this card is drawn today (a cover card, or the compact/comfortable size). */
+  presentation: Presentation;
   canEdit: boolean;
   canProgress: boolean;
   /** Other members' completion for "each person completes" cards. */
@@ -142,14 +145,16 @@ export function buildDayView(args: {
               complete: cardProgress(instance.spec, recs.get(`${instance.id}|${m.userId}`)?.state ?? emptyState()).complete,
             }))
         : [];
+    // precedence: this person's own choice for the card → a cover card → "always compact" → their day-view preference
+    const density: Density = placement.density ?? (instance.spec.density === "compact" ? "compact" : args.defaultDensity);
     return {
       instance,
       placement: { ...placement, sectionId: placement.sectionId && sectionIds.has(placement.sectionId) ? placement.sectionId : null },
       state,
       progress: cardProgress(instance.spec, state),
       summary: resolveSummary(instance.spec, state),
-      // precedence: this person's own choice for the card → a card set to "always compact" → their day-view preference
-      density: placement.density ?? (instance.spec.density === "compact" ? "compact" : args.defaultDensity),
+      density,
+      presentation: placement.density ? placement.density : instance.spec.style === "cover" ? "cover" : density,
       canEdit: canEditCard(instance, me, members),
       canProgress: canUpdateProgress(instance, me, scope, members),
       others,

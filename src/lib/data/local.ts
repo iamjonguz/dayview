@@ -31,6 +31,7 @@ import {
   type Series,
   type Workspace,
 } from "../domain/types";
+import { memoryImageStore, type ImageStore } from "./imageStore";
 import { applyPatch, type ProgressPatch, type Repo } from "./repo";
 
 /** Minimal storage abstraction so the demo store can run on localStorage in the browser and a Map in tests. */
@@ -118,7 +119,24 @@ export class LocalRepo implements Repo {
   constructor(
     private kv: KV,
     private timezone = "UTC",
+    private images: ImageStore = memoryImageStore(),
   ) {}
+
+  // ----- photos: same rule as the database policy — your own uploads, or photos on cards you can see in a group -----
+  async putImage(blob: Blob): Promise<string> {
+    const path = `${this.me()}/${uid()}.jpg`;
+    await this.images.put(path, blob);
+    return path;
+  }
+  async getImageUrl(path: string): Promise<string | null> {
+    const db = this.read();
+    const me = this.me();
+    const mine = path.split("/")[0] === me;
+    const sharedWithMe = db.instances.some((i) => i.groupId && roleIn(db.members, i.groupId, me) !== null && i.spec.cover.kind === "upload" && i.spec.cover.path === path);
+    if (!mine && !sharedWithMe) return null;
+    const blob = await this.images.get(path);
+    return blob && typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(blob) : null;
+  }
 
   // ----- persistence -----
   read(): LocalDB {

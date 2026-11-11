@@ -10,10 +10,10 @@ import { useApp } from "@/store/app";
 import { Page, PageHeader } from "./PageHeader";
 import { Button, Segmented, Spinner } from "./ui";
 import { useUi } from "@/store/ui";
+import { dayHref } from "@/lib/ui/links";
 
 export function HistoryPage() {
   const planner = useApp((s) => s.planner);
-  const setDate = useApp((s) => s.setDate);
   const [days, setDays] = useState<14 | 30 | 90>(14);
   const [data, setData] = useState<{ instances: CardInstance[]; progress: ProgressRecord[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +67,7 @@ export function HistoryPage() {
                         </li>
                       ))}
                     </ul>
-                    <Link href="/" onClick={() => void setDate(d)} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline">Open this day →</Link>
+                    <Link href={dayHref(d)} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline">Open this day →</Link>
                   </div>
                 </details>
               </li>
