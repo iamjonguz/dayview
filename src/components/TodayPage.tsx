@@ -1,11 +1,13 @@
 "use client";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import clsx from "clsx";
-import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, EyeOff, LayoutList, LayoutTemplate, ListOrdered, MoreHorizontal, Plus, Search, Rows3, Settings, Sun, Sunrise, Moon, Star, FastForward } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, EyeOff, LayoutTemplate, ListOrdered, MoreHorizontal, Plus, Search, Rows3, Settings, SlidersHorizontal, Sun, Sunrise, Moon, Star, FastForward } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import type { DayCard } from "@/lib/domain/dayview";
 import { formatLong, formatShort, relativeLabel, WEEKDAY_LABEL, weekdayOf } from "@/lib/domain/dates";
+import { ACTIVITY_PARAM, DATE_PARAM } from "@/lib/ui/links";
 import type { ID, Section } from "@/lib/domain/types";
 import { useApp } from "@/store/app";
 import { useUi } from "@/store/ui";
@@ -39,6 +41,50 @@ export function TodayPage() {
   const collapseDone = useUi((s) => s.collapseDone);
   const setCollapseDone = useUi((s) => s.setCollapseDone);
   const setViewDensity = useApp((s) => s.setViewDensity);
+  const requestOpen = useUi((s) => s.requestOpen);
+  const [doneOpen, setDoneOpen] = useState(false);
+
+  // ---- deep links: /?date=YYYY-MM-DD&card=<instance id> → that day, that card, expanded and in view
+  const params = useSearchParams();
+  const wantDate = params.get(DATE_PARAM);
+  const wantCard = params.get(ACTIVITY_PARAM);
+  const handled = useRef<string | null>(null);
+  const ready = !!ws && !!planner;
+  useEffect(() => {
+    if (!wantDate && !wantCard) {
+      handled.current = null;
+      return;
+    }
+    if (!ready) return;
+    const key = `${wantDate}|${wantCard}`;
+    if (handled.current === key) return;
+    handled.current = key;
+    // consume the parameters in place (no new history entry), so Back returns to wherever the link was followed from
+    window.history.replaceState(window.history.state, "", window.location.pathname);
+    void (async () => {
+      const app = useApp.getState();
+      const okDate = wantDate && /^\d{4}-\d{2}-\d{2}$/.test(wantDate) ? wantDate : null;
+      if (okDate && app.date !== okDate) await app.setDate(okDate);
+      else if (okDate) await app.refresh({ silent: true });
+      if (!wantCard) return;
+      const v = useApp.getState().view;
+      const all = v ? v.sections.flatMap((g) => g.cards) : [];
+      const hit = all.find((c) => c.instance.id === wantCard);
+      const t = useApp.getState().toast;
+      if (hit) {
+        setArrange(false);
+        if (useUi.getState().collapseDone && hit.progress.complete) setDoneOpen(true);
+        // let the (possibly just-opened) list mount before asking the card to open itself
+        requestAnimationFrame(() => requestAnimationFrame(() => requestOpen(wantCard)));
+        return;
+      }
+      const gone = v?.skipped.find((c) => c.instance.id === wantCard);
+      const hidden = v?.hidden.find((c) => c.instance.id === wantCard);
+      if (gone) t(`“${gone.instance.spec.title}” is skipped on this day. Restore it from “Skipped” below.`);
+      else if (hidden) t(`“${hidden.instance.spec.title}” is hidden from your day. Show it again from “Hidden from my day” below.`);
+      else t("That activity isn’t available any more. It may have been deleted or moved, or you may no longer have access.", { kind: "error" });
+    })();
+  }, [wantDate, wantCard, ready, requestOpen]);
 
   if (!ws || !planner) return null;
   const today = planner.today();
@@ -71,7 +117,16 @@ export function TodayPage() {
   const doneIds = new Set(doneCards.map((c) => c.instance.id));
   const sectionsToShow = (view?.sections ?? []).map((g) => ({ ...g, cards: g.cards.filter((c) => !doneIds.has(c.instance.id)) })).filter((g) => g.cards.length > 0 || (g.section && !arrange && doneCards.length === 0));
   const density = ws.prefs.defaultDensity;
-  const gridCls = "grid items-start gap-2.5 grid-cols-[repeat(auto-fill,minmax(19rem,1fr))]";
+  // Sections become columns on wide screens. Column count follows the number of sections actually shown (any number),
+  // tracks have a maximum width so cards stay readable, and the block is centred so no space is left stranded.
+  const nSections = sectionsToShow.length;
+  const sectionsGridCls = clsx(
+    "grid justify-center gap-x-6 gap-y-6 items-start",
+    nSections >= 2 && "md:grid-cols-[repeat(2,minmax(0,28rem))]",
+    nSections >= 3 && "xl:grid-cols-[repeat(3,minmax(0,28rem))]",
+  );
+  const gridCls = nSections === 1 ? "grid items-start justify-center gap-2.5 grid-cols-[repeat(auto-fill,minmax(19rem,26rem))]" : "grid items-start gap-2.5 grid-cols-1";
+  const doneGridCls = "grid items-start gap-2.5 grid-cols-[repeat(auto-fill,minmax(19rem,26rem))]";
 
   const renderCard = (c: DayCard, i: number, n: number) => (
     <li key={c.instance.id} className="min-w-0">
@@ -81,37 +136,39 @@ export function TodayPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-6 pt-3 md:px-8 md:pt-8">
-      {/* compact header: the cards should dominate the screen */}
+      {/* header: the date and Add are the primary controls; progress and view options stay compact and secondary */}
       <header className="mb-3">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="min-w-0 truncate font-serif text-[32px] leading-none md:text-5xl">{title}</h1>
-          <div className="flex shrink-0 items-center gap-2">
-            <IconButton label="Choose a date" onClick={() => setPickerOpen(true)}><CalendarDays size={20} /></IconButton>
-            <span className="hidden sm:block">
-              <Menu.Root>
-                <Menu.Trigger asChild><IconButton label="More day options"><MoreHorizontal size={20} /></IconButton></Menu.Trigger>
-                <DayMenu collapseDone={collapseDone} onCollapseDone={setCollapseDone} onSearch={() => setSearchOpen(true)} onArrange={() => setArrange(true)} onSections={() => setSectionsOpen(true)} onApply={() => setApplyOpen(true)} onSave={() => setSaveOpen(true)} />
-              </Menu.Root>
-            </span>
-            <Button variant="primary" onClick={() => openCreate(date)} aria-label="Add card"><Plus size={20} aria-hidden /> <span>Add<span className="hidden md:inline"> card</span></span></Button>
+        <div className="flex items-center gap-1">
+          <IconButton label="Previous day" bare className="-ml-2.5 text-muted" onClick={() => void shiftDate(-1)}><ChevronLeft size={22} /></IconButton>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-serif text-[28px] leading-none md:text-4xl">{title}</h1>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setPickerOpen(true)} aria-label={`${formatLong(date)}. Choose a date`} className="-my-1 inline-flex min-h-11 items-center gap-1 rounded-lg pr-1 text-[15px] text-muted hover:text-fg" aria-live="polite">
+                <span className="md:hidden">{title === rel || rel === "Upcoming" ? formatShort(date) : shortDay(date)}</span>
+                <span className="hidden md:inline">{formatLong(date)}</span>
+                <ChevronDown size={14} aria-hidden />
+              </button>
+              {date !== today && <button type="button" onClick={() => void setDate(today)} className="-my-1 inline-flex min-h-11 items-center rounded-lg px-2 text-[15px] font-medium text-accent hover:underline">Today</button>}
+            </div>
           </div>
+          <IconButton label="Next day" bare className="text-muted" onClick={() => void shiftDate(1)}><ChevronRight size={22} /></IconButton>
+          <Button variant="primary" onClick={() => openCreate(date)} aria-label="Add card" className="ml-1"><Plus size={20} aria-hidden /> <span>Add<span className="hidden md:inline"> card</span></span></Button>
         </div>
-        <div className="mt-1 flex items-center">
-          <IconButton label="Previous day" bare className="-ml-3 size-11 text-muted" onClick={() => void shiftDate(-1)}><ChevronLeft size={20} /></IconButton>
-          <p className="min-w-[8.5rem] text-center text-[17px] md:min-w-[11rem] md:text-lg" aria-live="polite"><span className="md:hidden">{formatShort(date)}</span><span className="hidden md:inline">{formatLong(date)}</span></p>
-          <IconButton label="Next day" bare className="size-11 text-muted" onClick={() => void shiftDate(1)}><ChevronRight size={20} /></IconButton>
-          {date !== today && <Button small variant="ghost" className="ml-1 text-accent" onClick={() => void setDate(today)}>Today</Button>}
-        </div>
-        <div className="flex items-center gap-3">
-          <p className="shrink-0 text-[15px] text-muted" aria-live="polite">{summary ? (summary.total === 0 ? "Nothing planned" : `${summary.done} of ${summary.total} complete`) : "\u00a0"}</p>
-          <ProgressBar fraction={summary && summary.total ? summary.done / summary.total : 0} label="Day progress" className="flex-1" />
-          <DensityToggle value={density} onChange={(d) => void setViewDensity(d)} />
-          <span className="sm:hidden">
+        <div className="mt-1 flex items-center gap-2">
+          <p className="shrink-0 text-sm text-muted" aria-live="polite">{summary ? (summary.total === 0 ? "Nothing planned" : `${summary.done} of ${summary.total} done`) : "\u00a0"}</p>
+          <ProgressBar fraction={summary && summary.total ? summary.done / summary.total : 0} label="Day progress" className="h-1 max-w-48 flex-1" />
+          <div className="ml-auto flex items-center">
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-[15px] font-medium text-fg hover:bg-surface-2 data-[state=open]:bg-surface-2"><SlidersHorizontal size={16} aria-hidden /> View <span className="sr-only">options: {density === "compact" ? "compact" : "comfortable"} cards</span></button>
+              </Menu.Trigger>
+              <ViewMenu density={density} onDensity={(d) => void setViewDensity(d)} collapseDone={collapseDone} onCollapseDone={setCollapseDone} />
+            </Menu.Root>
             <Menu.Root>
               <Menu.Trigger asChild><IconButton label="More day options" bare className="-mr-2 text-muted"><MoreHorizontal size={20} /></IconButton></Menu.Trigger>
-              <DayMenu collapseDone={collapseDone} onCollapseDone={setCollapseDone} onSearch={() => setSearchOpen(true)} onArrange={() => setArrange(true)} onSections={() => setSectionsOpen(true)} onApply={() => setApplyOpen(true)} onSave={() => setSaveOpen(true)} />
+              <DayMenu onSearch={() => setSearchOpen(true)} onArrange={() => setArrange(true)} onSections={() => setSectionsOpen(true)} onApply={() => setApplyOpen(true)} onSave={() => setSaveOpen(true)} />
             </Menu.Root>
-          </span>
+          </div>
         </div>
       </header>
 
@@ -138,16 +195,17 @@ export function TodayPage() {
         <ArrangeView view={view} sections={ws.sections} onChange={(l) => void reorder(l)} />
       ) : (
         <div className={clsx("space-y-5 transition-opacity", dayLoading && "opacity-70")}>
+          <div className={sectionsGridCls}>
           {sectionsToShow.map((g) => {
             const Icon = g.section ? ICONS[g.section.icon] : null;
             const hid = `sec-${g.section?.id ?? "none"}`;
             return (
-              <section key={g.section?.id ?? "none"} aria-labelledby={hid}>
+              <section key={g.section?.id ?? "none"} aria-labelledby={hid} className="min-w-0">
                 {(g.section || sectionsToShow.length > 1) && (
                   <div className="mb-1.5 flex items-center gap-2 px-0.5">
-                    {Icon && <Icon size={16} className="text-muted" aria-hidden />}
-                    <h2 id={hid} className="text-[15px] font-semibold text-muted">{g.section?.name ?? "Anytime"}</h2>
-                    <span className="text-sm text-muted/80">{g.cards.length}</span>
+                    {Icon && <Icon size={17} className="text-accent" aria-hidden />}
+                    <h2 id={hid} className="text-base font-semibold text-fg">{g.section?.name ?? "Anytime"}</h2>
+                    <span className="rounded-full bg-surface-2 px-2 text-sm tabular-nums text-muted">{g.cards.length}</span>
                     {g.section && <button className="ml-auto hidden min-h-11 items-center rounded-lg px-3 text-sm text-muted hover:bg-surface hover:text-fg md:inline-flex" onClick={() => openCreate(date, { sectionId: g.section!.id })}>+ Add</button>}
                   </div>
                 )}
@@ -159,16 +217,17 @@ export function TodayPage() {
               </section>
             );
           })}
+          </div>
 
           {doneCards.length > 0 && (
-            <details className="group rounded-xl border border-line">
+            <details open={doneOpen} onToggle={(e) => setDoneOpen(e.currentTarget.open)} className="group mx-auto max-w-[56rem] rounded-xl border border-line">
               <summary className="flex min-h-12 cursor-pointer items-center gap-2 px-4 text-[15px] font-semibold text-muted"><Check size={16} aria-hidden /> Done ({doneCards.length}) <ChevronDown size={16} className="ml-auto transition-transform group-open:rotate-180" aria-hidden /></summary>
-              <ul className={clsx(gridCls, "p-2.5 pt-0")}>{doneCards.map((c, i) => renderCard(c, i, doneCards.length))}</ul>
+              <ul className={clsx(doneGridCls, "p-2.5 pt-0")}>{doneCards.map((c, i) => renderCard(c, i, doneCards.length))}</ul>
             </details>
           )}
 
           {view.skipped.length > 0 && (
-            <details className="rounded-xl border border-line">
+            <details className="mx-auto max-w-[56rem] rounded-xl border border-line">
               <summary className="flex min-h-12 cursor-pointer items-center gap-2 px-4 text-[15px] text-muted"><FastForward size={16} aria-hidden /> Skipped ({view.skipped.length})</summary>
               <ul className="divide-y divide-line">
                 {view.skipped.map((c) => (
@@ -181,7 +240,7 @@ export function TodayPage() {
             </details>
           )}
           {view.hidden.length > 0 && (
-            <details className="rounded-xl border border-line">
+            <details className="mx-auto max-w-[56rem] rounded-xl border border-line">
               <summary className="flex min-h-12 cursor-pointer items-center gap-2 px-4 text-[15px] text-muted"><EyeOff size={16} aria-hidden /> Hidden from my day ({view.hidden.length})</summary>
               <ul className="divide-y divide-line">
                 {view.hidden.map((c) => (
@@ -206,34 +265,45 @@ export function TodayPage() {
   );
 }
 
-/** Compact / Comfortable: a persistent preference, always visible next to the day's progress. */
-function DensityToggle({ value, onChange }: { value: "compact" | "comfortable"; onChange: (d: "compact" | "comfortable") => void }) {
-  const opt = (d: "compact" | "comfortable", label: string, Icon: typeof Rows3) => (
-    <button type="button" aria-pressed={value === d} aria-label={`${label} cards`} title={`${label} cards`} onClick={() => onChange(d)} className={clsx("grid size-11 place-items-center rounded-lg", value === d ? "bg-surface-2 text-fg" : "text-muted hover:text-fg")}>
-      <Icon size={18} aria-hidden />
-    </button>
-  );
+const menuItem = "flex min-h-11 cursor-default items-center gap-3 rounded-xl px-3 text-[15px] outline-none data-[highlighted]:bg-white/10";
+const menuBox = "z-50 min-w-64 rounded-2xl border border-line bg-surface-2 p-1.5 shadow-lg";
+
+const shortDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+/** "View": how the day is displayed. Card size is a saved preference. */
+function ViewMenu({ density, onDensity, collapseDone, onCollapseDone }: { density: "compact" | "comfortable"; onDensity: (d: "compact" | "comfortable") => void; collapseDone: boolean; onCollapseDone: (b: boolean) => void }) {
   return (
-    <div role="group" aria-label="Card size" className="-my-1 flex shrink-0 items-center rounded-xl border border-line">
-      {opt("compact", "Compact", Rows3)}
-      {opt("comfortable", "Comfortable", LayoutList)}
-    </div>
+    <Menu.Portal>
+      <Menu.Content align="end" sideOffset={6} className={menuBox}>
+        <Menu.Label className="px-3 pb-1 pt-1.5 text-sm font-semibold text-muted">Card size</Menu.Label>
+        <Menu.RadioGroup value={density} onValueChange={(v) => onDensity(v as "compact" | "comfortable")}>
+          {([["compact", "Compact", "More activities on screen"], ["comfortable", "Comfortable", "Larger photos and room to breathe"]] as const).map(([v, label, hint]) => (
+            <Menu.RadioItem key={v} value={v} className={clsx(menuItem, "items-start py-2")}>
+              <span className="mt-0.5 grid size-4 place-items-center text-accent" aria-hidden><Menu.ItemIndicator><Check size={16} /></Menu.ItemIndicator></span>
+              <span><span className="block">{label}</span><span className="block text-sm text-muted">{hint}</span></span>
+            </Menu.RadioItem>
+          ))}
+        </Menu.RadioGroup>
+        <Menu.Separator className="my-1 h-px bg-line" />
+        <Menu.CheckboxItem className={menuItem} checked={collapseDone} onCheckedChange={onCollapseDone}>
+          <span className="grid size-4 place-items-center text-accent" aria-hidden><Menu.ItemIndicator><Check size={16} /></Menu.ItemIndicator></span> Collapse done cards
+        </Menu.CheckboxItem>
+      </Menu.Content>
+    </Menu.Portal>
   );
 }
 
-function DayMenu(p: { collapseDone: boolean; onCollapseDone: (b: boolean) => void; onSearch: () => void; onArrange: () => void; onSections: () => void; onApply: () => void; onSave: () => void }) {
-  const item = "flex min-h-11 cursor-default items-center gap-3 rounded-xl px-3 text-[15px] outline-none data-[highlighted]:bg-white/10";
+function DayMenu(p: { onSearch: () => void; onArrange: () => void; onSections: () => void; onApply: () => void; onSave: () => void }) {
   return (
     <Menu.Portal>
-      <Menu.Content align="end" sideOffset={6} className="z-50 min-w-60 rounded-2xl border border-line bg-surface-2 p-1.5 shadow-lg">
-        <Menu.Item className={item} onSelect={p.onSearch}><Search size={16} aria-hidden /> Search…</Menu.Item>
-        <Menu.CheckboxItem className={item} checked={p.collapseDone} onCheckedChange={p.onCollapseDone}><span className="grid size-4 place-items-center" aria-hidden>{p.collapseDone && <Check size={16} />}</span> Collapse done cards</Menu.CheckboxItem>
-        <Menu.Item className={item} onSelect={p.onArrange}><ListOrdered size={16} aria-hidden /> Arrange cards</Menu.Item>
-        <Menu.Item className={item} onSelect={p.onSections}><Rows3 size={16} aria-hidden /> Edit sections</Menu.Item>
-        <Menu.Item className={item} onSelect={p.onApply}><LayoutTemplate size={16} aria-hidden /> Apply a day layout…</Menu.Item>
-        <Menu.Item className={item} onSelect={p.onSave}><LayoutTemplate size={16} aria-hidden /> Save day as layout…</Menu.Item>
+      <Menu.Content align="end" sideOffset={6} className={menuBox}>
+        <Menu.Item className={menuItem} onSelect={p.onSearch}><Search size={16} aria-hidden /> Search…</Menu.Item>
+        <Menu.Item className={menuItem} onSelect={p.onArrange}><ListOrdered size={16} aria-hidden /> Arrange cards</Menu.Item>
+        <Menu.Item className={menuItem} onSelect={p.onSections}><Rows3 size={16} aria-hidden /> Edit sections</Menu.Item>
+        <Menu.Item className={menuItem} onSelect={p.onApply}><LayoutTemplate size={16} aria-hidden /> Apply a day layout…</Menu.Item>
+        <Menu.Item className={menuItem} onSelect={p.onSave}><LayoutTemplate size={16} aria-hidden /> Save day as layout…</Menu.Item>
         <Menu.Separator className="my-1 h-px bg-line" />
-        <Menu.Item asChild className={item}><Link href="/settings"><Settings size={16} aria-hidden /> Settings</Link></Menu.Item>
+        <Menu.Item asChild className={menuItem}><Link href="/settings"><Settings size={16} aria-hidden /> Settings</Link></Menu.Item>
       </Menu.Content>
     </Menu.Portal>
   );

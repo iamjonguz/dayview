@@ -6,15 +6,18 @@ export const uid = (): ID =>
     : "id-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 /** The first accent is the theme's own sage. Cards saved with the old default amber follow the theme accent too (see resolveAccent). */
-export const ACCENTS = ["#b8cdaa", "#e0a458", "#e08f7c", "#8fb8c9", "#a9a3d8", "#d9a0bf", "#c9c77a"];
-export const LEGACY_DEFAULT_ACCENT = "#e8a04c";
-export const resolveAccent = (a: string) => (!a || a.toLowerCase() === LEGACY_DEFAULT_ACCENT ? ACCENTS[0] : a);
+export const ACCENTS = ["#ff9b82", "#f2c46d", "#8ec5f0", "#b7a6f0", "#f0a0c8", "#c9d97a", "#7fd1d1"];
+/** Earlier default accents (amber, then sage). Cards still carrying one follow the theme / the activity's own colour. */
+export const LEGACY_DEFAULT_ACCENTS = ["#e8a04c", "#b8cdaa"];
+export const LEGACY_DEFAULT_ACCENT = LEGACY_DEFAULT_ACCENTS[0];
+export const isLegacyAccent = (a: string) => !a || LEGACY_DEFAULT_ACCENTS.includes(a.toLowerCase());
+export const resolveAccent = (a: string) => (isLegacyAccent(a) ? ACCENTS[0] : a);
 
 export const newCardSpec = (over: Partial<CardSpec> = {}): CardSpec => ({
   title: "",
   summary: "",
   cover: { kind: "none" },
-  accent: ACCENTS[0],
+  accent: "", // "" = match the activity (see lib/ui/activity.ts)
   density: "comfortable",
   front: { showTime: true, showSummary: true, showProgress: true },
   completion: { mode: "manual" },
@@ -83,5 +86,8 @@ export function cloneSpec(spec: CardSpec, freshIds = true): CardSpec {
     spec.completion.mode === "derived"
       ? { mode: "derived" as const, blockIds: spec.completion.blockIds.map((i) => idMap.get(i) ?? i) }
       : spec.completion;
-  return { ...spec, summarySource, cover: { ...spec.cover }, front: { ...spec.front }, completion, blocks };
+  const front = { ...spec.front };
+  if (front.personAssignmentId) front.personAssignmentId = idMap.get(front.personAssignmentId) ?? front.personAssignmentId;
+  if (front.progressBlockIds) front.progressBlockIds = front.progressBlockIds.map((i) => idMap.get(i) ?? i);
+  return { ...spec, summarySource, cover: { ...spec.cover }, focus: spec.focus ? { ...spec.focus } : undefined, front, completion, blocks };
 }

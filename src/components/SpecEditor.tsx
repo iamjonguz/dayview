@@ -2,10 +2,14 @@
 import clsx from "clsx";
 import { ArrowDown, ArrowUp, Bold, Check, ChevronDown, CircleHelp, Italic, List, ListChecks, Plus, StickyNote, Target, Trash2, Users, X } from "lucide-react";
 import { useId, useRef, useState, type ReactNode } from "react";
-import { ACCENTS, addBlock, resolveAccent, uid } from "@/lib/domain/factory";
-import { trackingBlocks } from "@/lib/domain/progress";
-import type { Block, BlockType, CardSpec, Cover } from "@/lib/domain/types";
-import { COVER_COLORS, COVER_PRESETS, presetUri } from "@/lib/ui/covers";
+import { ACCENTS, addBlock, uid } from "@/lib/domain/factory";
+import { frontBlocks, relevantBlocks, trackingBlocks } from "@/lib/domain/progress";
+import type { Block, BlockType, CardSpec, ID } from "@/lib/domain/types";
+import { CardPreview } from "./CardPreview";
+import { CoverPicker } from "./CoverPicker";
+import { COVER_PRESETS } from "@/lib/ui/covers";
+import { ACTIVITY_ICONS, ICON_KEYS, activityIconKey } from "@/lib/ui/activity";
+import { ChecklistEditor } from "./ChecklistEditor";
 import { Button, Field, IconButton, Segmented, inputCls } from "./ui";
 
 const BLOCK_META: Record<BlockType, { label: string; icon: ReactNode }> = {
@@ -50,7 +54,7 @@ export function Help({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-export function SpecEditor({ spec, onChange }: { spec: CardSpec; onChange: (s: CardSpec) => void }) {
+export function SpecEditor({ spec, onChange, groupId = null }: { spec: CardSpec; onChange: (s: CardSpec) => void; groupId?: ID | null }) {
   const id = useId();
   const set = (p: Partial<CardSpec>) => onChange({ ...spec, ...p });
   const setBlock = (b: Block) => set({ blocks: spec.blocks.map((x) => (x.id === b.id ? b : x)) });
@@ -64,7 +68,8 @@ export function SpecEditor({ spec, onChange }: { spec: CardSpec; onChange: (s: C
   const removeBlock = (b: Block) => {
     const completion = spec.completion.mode === "derived" ? { mode: "derived" as const, blockIds: spec.completion.blockIds.filter((x) => x !== b.id) } : spec.completion;
     const summarySource = spec.summarySource && spec.summarySource.kind !== "text" && spec.summarySource.blockId === b.id ? undefined : spec.summarySource;
-    set({ blocks: spec.blocks.filter((x) => x.id !== b.id), completion, summarySource });
+    const front = spec.front.progressBlockIds ? { ...spec.front, progressBlockIds: spec.front.progressBlockIds.filter((x) => x !== b.id) } : spec.front;
+    set({ blocks: spec.blocks.filter((x) => x.id !== b.id), completion, summarySource, front });
   };
   const tracking = trackingBlocks(spec);
   const derivedIds = spec.completion.mode === "derived" ? spec.completion.blockIds : [];
@@ -73,10 +78,11 @@ export function SpecEditor({ spec, onChange }: { spec: CardSpec; onChange: (s: C
   const sourceOptions = [
     ...spec.blocks.filter((b) => b.type === "checklist").map((b) => ({ v: `next-item:${b.id}`, l: `Next item in “${b.title || "Checklist"}”` })),
     ...spec.blocks.filter((b) => b.type === "progress").map((b) => ({ v: `progress:${b.id}`, l: `Progress of “${b.title || "Progress"}”` })),
+    ...spec.blocks.filter((b) => b.type === "note").map((b) => ({ v: `note:${b.id}`, l: `First line of “${b.title || "Notes"}”` })),
   ];
   const onSource = (v: string) => {
     if (v === "text") return set({ summarySource: undefined });
-    const [kind, blockId] = v.split(":") as ["next-item" | "progress", string];
+    const [kind, blockId] = v.split(":") as ["next-item" | "progress" | "note", string];
     set({ summarySource: { kind, blockId } });
   };
   const completionSummary = spec.completion.mode === "manual" ? "I mark it done" : "From checklists & targets";
@@ -102,6 +108,9 @@ export function SpecEditor({ spec, onChange }: { spec: CardSpec; onChange: (s: C
         <Field label="Summary" htmlFor={`${id}-sum`}>
           <input id={`${id}-sum`} className={inputCls} value={spec.summary} disabled={src.kind !== "text"} onChange={(e) => set({ summary: e.target.value })} placeholder={src.kind === "text" ? "One line shown on the card, e.g. Salmon, rice & broccoli" : "Shown automatically"} />
         </Field>
+        <Field label="Detail (optional)" htmlFor={`${id}-ctx`} hint="Shown before the summary: a project, route or book title.">
+          <input id={`${id}-ctx`} className={inputCls} value={spec.context ?? ""} onChange={(e) => set({ context: e.target.value || undefined })} placeholder="e.g. Atlas redesign" autoComplete="off" />
+        </Field>
         {sourceOptions.length > 0 && (
           <Field label="Summary shows" htmlFor={`${id}-src`}>
             <select id={`${id}-src`} className={inputCls} value={srcValue} onChange={(e) => onSource(e.target.value)}>
@@ -111,6 +120,8 @@ export function SpecEditor({ spec, onChange }: { spec: CardSpec; onChange: (s: C
           </Field>
         )}
       </Group>
+
+      <CardPreview spec={spec} groupId={groupId} />
 
       <Group title="Content" help={<Help label="About content blocks">Build the back of the card from blocks and reorder them with the arrows. Notes can also be edited straight from the card.</Help>}>
         <div className="space-y-3">
@@ -136,21 +147,46 @@ export function SpecEditor({ spec, onChange }: { spec: CardSpec; onChange: (s: C
         </div>
       </Group>
 
-      <Disclosure title="Appearance" summary={`${coverSummary} · ${spec.density === "compact" ? "always compact" : "follows my view"}`}>
-        <CoverPicker cover={spec.cover} onChange={(cover) => set({ cover })} />
+      <Disclosure title="Appearance" summary={`${coverSummary} · ${spec.style === "cover" ? "cover card" : spec.density === "compact" ? "always compact" : "follows my view"}`}>
+        <CoverPicker cover={spec.cover} focus={spec.focus} onChange={(p) => set(p)} />
         <div>
-          <p className="mb-1.5 text-sm font-medium text-muted">Card colour</p>
-          <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Card colour">
-            {ACCENTS.map((c) => (
-              <button key={c} type="button" role="radio" aria-checked={resolveAccent(spec.accent).toLowerCase() === c} aria-label={`Colour ${c}`} onClick={() => set({ accent: c })} className="grid size-11 place-items-center rounded-full">
-                <span className={clsx("grid size-8 place-items-center rounded-full border-2", resolveAccent(spec.accent).toLowerCase() === c ? "border-fg" : "border-transparent")} style={{ background: c }}>{resolveAccent(spec.accent).toLowerCase() === c && <Check size={14} strokeWidth={3} className="text-accent-ink" />}</span>
-              </button>
-            ))}
+          <p className="mb-1.5 text-sm font-medium text-muted">Icon</p>
+          <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Icon">
+            {[["", "Auto"], ...ICON_KEYS.filter((k) => k !== "coffee").map((k) => [k, ACTIVITY_ICONS[k].label])].map(([k, label]) => {
+              const key = k || activityIconKey({ ...spec, icon: undefined });
+              const { Icon } = ACTIVITY_ICONS[key];
+              const on = (spec.icon ?? "") === k;
+              return (
+                <button key={k || "auto"} type="button" role="radio" aria-checked={on} aria-label={k ? label : `Automatic (${ACTIVITY_ICONS[key].label})`} title={k ? label : "Automatic: chosen from the title"} onClick={() => set({ icon: k || undefined })} className={clsx("grid size-11 place-items-center rounded-xl border-2", on ? "border-accent bg-accent/15 text-accent" : "border-line text-muted hover:text-fg")}>
+                  <Icon size={20} aria-hidden />
+                </button>
+              );
+            })}
           </div>
         </div>
         <div>
-          <p className="mb-1.5 text-sm font-medium text-muted">Card size</p>
-          <Segmented label="Card size" value={spec.density === "compact" ? "compact" : "follow"} onChange={(v) => set({ density: v === "compact" ? "compact" : "comfortable" })} options={[{ value: "follow", label: "Follow my view" }, { value: "compact", label: "Always compact" }]} />
+          <p className="mb-1.5 text-sm font-medium text-muted">Card colour</p>
+          <div className="flex flex-wrap items-center gap-1" role="radiogroup" aria-label="Card colour">
+            <button type="button" role="radio" aria-checked={!spec.accent} onClick={() => set({ accent: "" })} className={clsx("min-h-11 rounded-xl border-2 px-3 text-sm", !spec.accent ? "border-accent bg-accent/15 text-accent" : "border-line text-muted hover:text-fg")}>Match activity</button>
+            {ACCENTS.map((c) => {
+              const on = !!spec.accent && spec.accent.toLowerCase() === c;
+              return (
+                <button key={c} type="button" role="radio" aria-checked={on} aria-label={`Colour ${c}`} onClick={() => set({ accent: c })} className="grid size-11 place-items-center rounded-full">
+                  <span className={clsx("grid size-8 place-items-center rounded-full border-2", on ? "border-fg" : "border-transparent")} style={{ background: c }}>{on && <Check size={14} strokeWidth={3} className="text-accent-ink" />}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-muted">Card style</p>
+          <Segmented
+            label="Card style"
+            value={spec.style === "cover" ? "cover" : spec.density === "compact" ? "compact" : "follow"}
+            onChange={(v) => set(v === "cover" ? { style: "cover", density: "comfortable" } : { style: undefined, density: v === "compact" ? "compact" : "comfortable" })}
+            options={[{ value: "follow", label: "Follow my view" }, { value: "compact", label: "Always compact" }, { value: "cover", label: "Cover card" }]}
+          />
+          {spec.style === "cover" && spec.cover.kind === "none" && <p className="mt-1.5 text-sm text-muted">Without a photo, a cover card shows a tinted banner with the activity icon.</p>}
         </div>
         <fieldset>
           <legend className="mb-1 text-sm font-medium text-muted">Show on the front</legend>
@@ -160,7 +196,27 @@ export function SpecEditor({ spec, onChange }: { spec: CardSpec; onChange: (s: C
               {label}
             </label>
           ))}
+          {spec.front.showProgress && tracking.length > 0 && (
+            <div className="mt-2 border-t border-line pt-2">
+              <p className="mb-0.5 flex items-center gap-1 text-sm font-medium text-muted">Progress counts<Help label="About front progress">Chooses which lists and targets feed the progress line on the front of the card. It only changes what is shown — never when the card counts as done.</Help></p>
+              {tracking.map((t) => {
+                const shown = frontBlocks(spec).some((x) => x.id === t.id);
+                return (
+                  <label key={t.id} className="flex min-h-11 items-center gap-3">
+                    <input type="checkbox" className="size-5 accent-[var(--color-accent)]" checked={shown} onChange={(e) => {
+                      const cur = frontBlocks(spec).map((x) => x.id);
+                      const next = e.target.checked ? [...cur, t.id] : cur.filter((x) => x !== t.id);
+                      const dflt = relevantBlocks(spec).map((x) => x.id);
+                      set({ front: { ...spec.front, progressBlockIds: next.length === dflt.length && next.every((x) => dflt.includes(x)) ? undefined : next } });
+                    }} />
+                    <span>{t.title || BLOCK_META[t.type].label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </fieldset>
+        {groupId && <PeopleSettings spec={spec} onChange={set} />}
       </Disclosure>
 
       <Disclosure title="Completion behavior" summary={completionSummary}>
@@ -194,79 +250,9 @@ export function SpecEditor({ spec, onChange }: { spec: CardSpec; onChange: (s: C
   );
 }
 
-function CoverPicker({ cover, onChange }: { cover: Cover; onChange: (c: Cover) => void }) {
-  const id = useId();
-  const tile = (active: boolean) => clsx("relative h-14 overflow-hidden rounded-xl border-2 text-sm", active ? "border-accent" : "border-line");
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium text-muted">Cover</p>
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Cover">
-        <button type="button" role="radio" aria-checked={cover.kind === "none"} className={clsx(tile(cover.kind === "none"), "bg-bg")} onClick={() => onChange({ kind: "none" })}>None</button>
-        {COVER_PRESETS.map((p) => (
-          <button key={p.id} type="button" role="radio" aria-checked={cover.kind === "preset" && cover.id === p.id} aria-label={p.label} title={p.label} className={tile(cover.kind === "preset" && cover.id === p.id)} onClick={() => onChange({ kind: "preset", id: p.id })}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={presetUri(p.id)!} alt="" className="size-full object-cover" />
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Plain colour covers">
-        <span className="text-sm text-muted">Plain colour</span>
-        {COVER_COLORS.map((c) => {
-          const on = cover.kind === "color" && cover.color === c;
-          return (
-            <button key={c} type="button" role="radio" aria-checked={on} aria-label={`Colour ${c}`} onClick={() => onChange({ kind: "color", color: c })} className="grid size-11 place-items-center rounded-full">
-              <span className={clsx("grid size-8 place-items-center rounded-full border-2", on ? "border-fg" : "border-line")} style={{ background: c }}>{on && <Check size={14} strokeWidth={3} className="text-fg" />}</span>
-            </button>
-          );
-        })}
-      </div>
-      <Field label="Or a photo URL" htmlFor={`${id}-url`} hint="If it can’t load, the card falls back to a plain surface.">
-        <input id={`${id}-url`} className={inputCls} inputMode="url" placeholder="https://…" value={cover.kind === "url" ? cover.url : ""} onChange={(e) => onChange(e.target.value.trim() ? { kind: "url", url: e.target.value.trim() } : { kind: "none" })} />
-      </Field>
-    </div>
-  );
-}
-
 function BlockBody({ block, onChange }: { block: Block; onChange: (b: Block) => void }) {
   if (block.type === "note") return <NoteEditor value={block.text} onChange={(text) => onChange({ ...block, text })} />;
-  if (block.type === "checklist") {
-    const setItems = (items: typeof block.items) => onChange({ ...block, items });
-    return (
-      <div className="space-y-2">
-        {block.items.map((it, i) => (
-          <div key={it.id} className="flex flex-wrap items-center gap-1">
-            <input
-              aria-label={`Item ${i + 1}`}
-              className={clsx(inputCls, "min-w-[11rem] flex-1")}
-              value={it.text}
-              onChange={(e) => setItems(block.items.map((x) => (x.id === it.id ? { ...x, text: e.target.value } : x)))}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  const n = { id: uid(), text: "" };
-                  const items = [...block.items];
-                  items.splice(i + 1, 0, n);
-                  setItems(items);
-                  requestAnimationFrame(() => (document.querySelector(`[data-item="${n.id}"]`) as HTMLInputElement | null)?.focus());
-                }
-              }}
-              data-item={it.id}
-            />
-            <span className="ml-auto flex"><IconButton label={`Move item ${i + 1} up`} variant="ghost" disabled={i === 0} onClick={() => { const a = [...block.items]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; setItems(a); }}><ArrowUp size={14} /></IconButton>
-            <IconButton label={`Move item ${i + 1} down`} variant="ghost" disabled={i === block.items.length - 1} onClick={() => { const a = [...block.items]; [a[i + 1], a[i]] = [a[i], a[i + 1]]; setItems(a); }}><ArrowDown size={14} /></IconButton>
-            <IconButton label={`Remove item ${i + 1}`} variant="ghost" className="text-danger" onClick={() => setItems(block.items.filter((x) => x.id !== it.id))}><X size={14} /></IconButton></span>
-          </div>
-        ))}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button small onClick={() => setItems([...block.items, { id: uid(), text: "" }])}><Plus size={14} aria-hidden /> Add item</Button>
-          <label className="ml-auto flex items-center gap-2 text-sm text-muted">
-            Called
-            <input aria-label="What items are called (plural)" className={clsx(inputCls, "w-28 text-sm")} value={block.noun ?? ""} placeholder="items" onChange={(e) => onChange({ ...block, noun: e.target.value || undefined })} />
-          </label>
-        </div>
-      </div>
-    );
-  }
+  if (block.type === "checklist") return <ChecklistEditor block={block} onChange={onChange} />;
   if (block.type === "progress")
     return (
       <div className="grid grid-cols-3 gap-2">
@@ -328,3 +314,30 @@ function NoteEditor({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
+
+/** Shared cards: choose what the front says about people. Nothing is guessed — one responsibility, picked by you, or just the group. */
+function PeopleSettings({ spec, onChange }: { spec: CardSpec; onChange: (p: Partial<CardSpec>) => void }) {
+  const id = useId();
+  const duties = spec.blocks.flatMap((b) => (b.type === "responsibility" ? b.assignments.map((a) => ({ id: a.id, label: a.label || "Unnamed", block: b.title })) : []));
+  const on = spec.front.showPeople !== false;
+  const setFront = (p: Partial<CardSpec["front"]>) => onChange({ front: { ...spec.front, ...p } });
+  return (
+    <fieldset className="space-y-1 rounded-xl border border-line p-3">
+      <legend className="px-1 text-sm font-medium text-muted">People on the front</legend>
+      <label className="flex min-h-11 items-center gap-3">
+        <input type="checkbox" className="size-5 accent-[var(--color-accent)]" checked={on} onChange={(e) => setFront({ showPeople: e.target.checked })} />
+        Show the group{duties.length ? " and one responsibility" : ""}
+      </label>
+      {on && duties.length > 0 && (
+        <Field label="Featured responsibility" htmlFor={`${id}-duty`} hint="Only the one you pick is shown, e.g. “Family · Maja cooking”.">
+          <select id={`${id}-duty`} className={inputCls} value={spec.front.personAssignmentId ?? ""} onChange={(e) => setFront({ personAssignmentId: e.target.value || undefined })}>
+            <option value="">Group name only</option>
+            {duties.map((d) => <option key={d.id} value={d.id}>{d.label}{duties.length > 1 && d.block ? ` (${d.block})` : ""}</option>)}
+          </select>
+        </Field>
+      )}
+      {on && duties.length === 0 && <p className="text-sm text-muted">Add a Responsibilities block to feature who is doing what.</p>}
+      <p className="text-sm text-muted">Everyone in the group sees the same line; it is part of the card, not a personal setting.</p>
+    </fieldset>
+  );
+}

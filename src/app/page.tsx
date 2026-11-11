@@ -1,4 +1,9 @@
+import { Suspense } from "react";
 import { TodayPage } from "@/components/TodayPage";
 export default function Page() {
-  return <TodayPage />;
+  return (
+    <Suspense>
+      <TodayPage />
+    </Suspense>
+  );
 }

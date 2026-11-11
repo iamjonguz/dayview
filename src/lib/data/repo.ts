@@ -65,6 +65,11 @@ export interface Repo {
   setMemberRole(groupId: ID, userId: ID, role: Exclude<Role, "owner">): Promise<void>;
   removeMember(groupId: ID, userId: ID): Promise<void>;
 
+  /** Stores an already-resized photo for the signed-in user and returns its path ("<user id>/<image id>.jpg"). */
+  putImage(blob: Blob): Promise<string>;
+  /** A short-lived readable URL for a photo, or null when it is missing or this person may not see it. */
+  getImageUrl(path: string): Promise<string | null>;
+
   /** Calls `cb` when data may have changed elsewhere. Returns an unsubscribe function. */
   subscribe(cb: () => void): () => void;
 }

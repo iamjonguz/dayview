@@ -7,6 +7,7 @@ import {
   CalendarClock,
   CalendarPlus,
   Check,
+  CircleHelp,
   Clock,
   Copy,
   EyeOff,
@@ -14,7 +15,6 @@ import {
   FastForward,
   ChevronDown,
   ChevronUp,
-  ListChecks,
   Maximize2,
   Minimize2,
   MoreHorizontal,
@@ -24,14 +24,17 @@ import {
   Users,
   Minus,
 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { DayCard } from "@/lib/domain/dayview";
 import { formatTimeRange } from "@/lib/domain/dates";
-import { newBlock, resolveAccent, uid } from "@/lib/domain/factory";
-import { fmtNum, isTracking, blockFraction, blockComplete } from "@/lib/domain/progress";
+import { frontText, peopleLine } from "@/lib/domain/front";
+import { newBlock, uid } from "@/lib/domain/factory";
+import { fmtNum, isTracking, blockFraction, blockComplete, relevantBlocks } from "@/lib/domain/progress";
 import type { ChecklistBlock, ID, ProgressBlock, ResponsibilityBlock, Section, Workspace } from "@/lib/domain/types";
 import { useApp } from "@/store/app";
-import { CoverBackground, hasImage, ProgressBar, RichText } from "./bits";
+import { activityStyle } from "@/lib/ui/activity";
+import { useUi } from "@/store/ui";
+import { ActivityPanel, ActivityVisual, CoverBackground, CoverBanner, hasImage, PROGRESS_FILL, ProgressBar, RichText } from "./bits";
 import { IconButton, inputCls } from "./ui";
 
 export type MoveRequest = { dir?: -1 | 1; sectionId?: ID | null };
@@ -50,6 +53,8 @@ interface Props {
 
 const FLIP_OUT_MS = 150;
 
+type FlipOpts = { tracking?: boolean };
+
 export function ActivityCard(props: Props) {
   const [face, setFace] = useState<"front" | "back">("front");
   const [phase, setPhase] = useState<"idle" | "out" | "in">("idle");
@@ -57,12 +62,19 @@ export function ActivityCard(props: Props) {
   const flipBtnRef = useRef<HTMLButtonElement>(null);
   const topBefore = useRef<number | null>(null);
   const refocus = useRef(false);
+  const toTracking = useRef(false);
+  const arrive = useRef(false);
+  const id = props.card.instance.id;
 
-  const flip = useCallback(() => {
-    if (phase !== "idle") return;
-    topBefore.current = rootRef.current?.getBoundingClientRect().top ?? null;
-    setPhase("out");
-  }, [phase]);
+  const flip = useCallback(
+    (opts?: FlipOpts) => {
+      if (phase !== "idle") return;
+      toTracking.current = !!opts?.tracking;
+      topBefore.current = rootRef.current?.getBoundingClientRect().top ?? null;
+      setPhase("out");
+    },
+    [phase],
+  );
 
   // phase machine: out → swap face → in → idle. Only one face is ever in the DOM, so the hidden face
   // can't be focused or read by assistive tech.
@@ -92,72 +104,90 @@ export function ActivityCard(props: Props) {
       const r = el.getBoundingClientRect();
       if (face === "back" && r.top < 56) window.scrollBy({ top: r.top - 72, behavior: "instant" as ScrollBehavior });
     }
-    flipBtnRef.current?.focus({ preventScroll: true });
+    const track = face === "back" && toTracking.current ? (el?.querySelector("[data-track-first]:not(:disabled)") as HTMLElement | null) : null;
+    toTracking.current = false;
+    (track ?? flipBtnRef.current)?.focus({ preventScroll: true });
   }, [phase, face]);
 
+  // Deep link ("show me this activity"): open the card's details, scroll it into view once, then move focus to its close control.
+  useEffect(
+    () =>
+      useUi.subscribe((st) => {
+        const t = st.openTarget;
+        if (!t || t.id !== id) return;
+        arrive.current = true;
+        setFace("back");
+        useUi.getState().consumeTarget(t.nonce);
+      }),
+    [id],
+  );
+  useEffect(() => {
+    if (face !== "back" || !arrive.current) return;
+    arrive.current = false;
+    const el = rootRef.current;
+    if (!el) return;
+    const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
+    flipBtnRef.current?.focus({ preventScroll: true });
+  }, [face]);
+
   return (
-    <div ref={rootRef} className={clsx("[transform-style:flat]", phase === "out" && "flip-out", phase === "in" && "flip-in")}>
+    <div ref={rootRef} id={`card-${id}`} data-card-id={id} className={clsx("scroll-mt-24 [transform-style:flat]", phase === "out" && "flip-out", phase === "in" && "flip-in")}>
       {face === "front" ? <Front {...props} flipRef={flipBtnRef} onFlip={flip} /> : <Back {...props} flipRef={flipBtnRef} onFlip={flip} />}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ completion control */
+/** Manual completion: a square checkbox. Always means "you decide". */
+function Checkbox({ checked, disabled, onToggle, label }: { checked: boolean; disabled?: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button type="button" role="checkbox" aria-checked={checked} aria-disabled={disabled || undefined} aria-label={label} title={disabled ? "Only editors can change this shared card’s completion" : undefined} onClick={() => !disabled && onToggle()} className={clsx("relative z-10 grid size-11 shrink-0 place-items-center rounded-full", disabled ? "cursor-not-allowed opacity-60" : "hover:bg-white/5")}>
+      <span className={clsx("grid size-6 place-items-center rounded-md border-2", checked ? "border-done bg-done" : "border-muted")}>
+        {checked && <Check size={16} strokeWidth={3.5} className="text-done-ink" aria-hidden />}
+      </span>
+    </button>
+  );
+}
+
+/** Automatic completion: a progress ring. It reports progress and opens the tracking controls; it can't be ticked. */
 function Ring({ fraction, complete, size = 28, accent }: { fraction: number; complete: boolean; size?: number; accent: string }) {
-  const r = (size - 4) / 2;
+  const r = (size - 5) / 2;
   const c = 2 * Math.PI * r;
+  const frac = complete ? 1 : fraction;
   return (
     <span className="relative inline-flex" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden className="text-muted">
-        <circle cx={size / 2} cy={size / 2} r={r} fill={complete ? accent : "none"} stroke={complete ? accent : "currentColor"} strokeWidth="2" />
-        {!complete && fraction > 0 && (
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={accent} strokeWidth="3" strokeDasharray={`${c * fraction} ${c}`} strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-        )}
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-line)" strokeWidth="3.5" />
+        {frac > 0 && <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={complete ? "var(--color-done)" : accent} strokeWidth="3.5" strokeDasharray={`${c * frac} ${c}`} strokeLinecap="round" />}
       </svg>
-      {complete && <Check size={size * 0.6} strokeWidth={3} className="absolute inset-0 m-auto text-accent-ink" />}
+      {complete && <Check size={size * 0.5} strokeWidth={3.5} className="absolute inset-0 m-auto text-done" aria-hidden />}
     </span>
   );
 }
 
 /** Completion is its own control — never part of the "open details" target. */
-function CompletionControl({ card, title }: { card: DayCard; title: string }) {
+function CompletionControl({ card, title, onOpenTracking }: { card: DayCard; title: string; onOpenTracking: () => void }) {
   const patch = useApp((s) => s.patchProgress);
   const derived = card.instance.spec.completion.mode === "derived";
-  const accent = resolveAccent(card.instance.spec.accent);
-  const { complete, fraction } = card.progress;
-  if (derived || !card.canProgress) {
-    const why = derived ? "completes automatically from its checklist and targets" : "only editors can change this shared card’s completion";
+  const { complete, fraction, label } = card.progress;
+  if (derived)
     return (
-      <span className="relative z-10 grid size-11 shrink-0 place-items-center" role="img" aria-label={`${complete ? "Complete" : "Not complete"}, ${why}`} title={why}>
-        <Ring fraction={fraction} complete={complete} accent={accent} />
-      </span>
+      <button
+        type="button"
+        onClick={onOpenTracking}
+        aria-label={`${title}: ${complete ? "complete" : label || "not complete"}. Completes automatically. Open tracking`}
+        title={`Completes automatically from ${label || "its tracking"} — select to open tracking`}
+        className="relative z-10 grid size-11 shrink-0 place-items-center rounded-full hover:bg-white/5"
+      >
+        <Ring fraction={fraction} complete={complete} accent={PROGRESS_FILL} />
+      </button>
     );
-  }
-  return (
-    <button
-      type="button"
-      aria-pressed={complete}
-      aria-label={`Mark ${title} as done`}
-      onClick={() => void patch(card, { completed: !complete })}
-      className="relative z-10 grid size-11 shrink-0 place-items-center rounded-full hover:bg-white/5"
-    >
-      <Ring fraction={0} complete={complete} accent={accent} />
-    </button>
-  );
+  return <Checkbox checked={complete} disabled={!card.canProgress} label={`Mark ${title} as done`} onToggle={() => void patch(card, { completed: !complete })} />;
 }
 
 /* ------------------------------------------------------------------ front */
-function GroupBadge({ card, ws }: { card: DayCard; ws: Workspace }) {
-  const g = ws.groups.find((x) => x.id === card.instance.groupId);
-  if (!g) return null;
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-surface-2 px-2 py-0.5 text-[13px] font-medium text-fg">
-      <Users size={12} aria-hidden /> {g.name}
-    </span>
-  );
-}
-
-/** Short, plain-language relationship between the checklist/target progress and the card's own completion. */
+/** Short, plain-language relationship between the checklist/target progress and a manual card's own completion. */
 function progressNote(card: DayCard): string | null {
   const manual = card.instance.spec.completion.mode === "manual";
   if (!manual || !card.progress.hasTracking) return null;
@@ -166,110 +196,172 @@ function progressNote(card: DayCard): string | null {
   return null;
 }
 
-function Front({ card, ws, onFlip, flipRef }: Props & { onFlip: () => void; flipRef: React.RefObject<HTMLButtonElement | null> }) {
+type FrontProps = { card: DayCard; ws: Workspace; onFlip: (o?: FlipOpts) => void; flipRef: React.RefObject<HTMLButtonElement | null> };
+
+/** Small "·"-separated pieces of metadata, each of which can shrink or stay whole. */
+function MetaLine({ pieces, className }: { pieces: { key: string; node: React.ReactNode; grow?: boolean }[]; className?: string }) {
+  return (
+    <p className={clsx("flex min-w-0 items-center gap-x-1.5 text-[14px] leading-snug text-muted tabular-nums", className)}>
+      {pieces.map((p, i) => (
+        <Fragment key={p.key}>
+          {i > 0 && <span aria-hidden className="shrink-0">·</span>}
+          <span className={clsx("inline-flex items-center gap-1", p.grow ? "min-w-0 shrink" : "shrink-0 whitespace-nowrap")}>{p.node}</span>
+        </Fragment>
+      ))}
+    </p>
+  );
+}
+
+/** The front of a card. Also used (inert) by the editor's live preview. */
+export function CardFront({ card, ws, onFlip, flipRef }: FrontProps) {
   const { spec } = card.instance;
-  const compact = card.density === "compact";
+  const mode = card.presentation;
+  const compact = mode === "compact";
+  const cover = mode === "cover";
   const img = hasImage(spec.cover);
-  const accent = resolveAccent(spec.accent);
+  const { color } = activityStyle(spec);
   const done = card.progress.complete;
+  const derived = spec.completion.mode === "derived";
   const time = spec.front.showTime ? formatTimeRange(spec.time, spec.endTime) : "";
-  const summary = spec.front.showSummary ? card.summary : "";
-  const showProg = spec.front.showProgress && card.progress.hasTracking;
+  const fp = card.progress.front;
+  const showProg = spec.front.showProgress && fp.has;
   const note = showProg ? progressNote(card) : null;
-  // the label is dropped when the summary already says the same thing (e.g. "12 of 20 pages")
-  const progText = showProg && summary !== card.progress.label ? (note === "Ready to mark done" && compact ? note : card.progress.label) : "";
+  const text = spec.front.showSummary ? frontText(spec, card.summary, [time, fp.label]) : { context: "", summary: "" };
+  // the progress label is dropped when the summary already says the same thing (e.g. "12 of 20 pages")
+  const progText = showProg && card.summary !== fp.label ? (note === "Ready to mark done" && compact ? note : fp.label) : "";
+  const people = peopleLine(spec, card.instance.groupId, ws);
+  const peopleNode = people && (
+    <>
+      <Users size={12} aria-hidden className="shrink-0" />
+      <span className="sr-only">Shared with </span>
+      {people.person && <span aria-hidden className="grid size-[18px] shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-semibold text-fg">{people.person.initials}</span>}
+      <span className="min-w-0 truncate">{people.text}</span>
+    </>
+  );
+  const status = done ? "Done" : derived ? "auto" : "";
+  const pieces = [
+    time && { key: "t", node: time },
+    people && { key: "p", node: peopleNode, grow: true },
+    progText && { key: "g", node: progText },
+    status && { key: "s", node: done ? <span className="text-done">{status}</span> : status },
+  ].filter(Boolean) as { key: string; node: React.ReactNode; grow?: boolean }[];
+
+  const tint = { backgroundImage: `linear-gradient(90deg, color-mix(in srgb, ${color} 9%, transparent), transparent 46%)` };
+  const showBigCover = mode === "comfortable" && img;
+  const panel = compact || (mode === "comfortable" && !img);
 
   return (
-    <article
-      aria-label={spec.title}
-      className={clsx("relative isolate overflow-hidden rounded-2xl border transition-colors", done ? "border-line/60 bg-surface/55" : "border-line bg-surface hover:border-muted/40")}
-    >
-      {img && (
+    <article aria-label={spec.title} style={showBigCover ? undefined : tint} className={clsx("relative isolate overflow-hidden rounded-2xl border bg-surface transition-colors", done ? "border-done/25" : "border-line hover:border-muted/50", done && !showBigCover && "bg-surface/80")}>
+      {cover && <CoverBanner spec={spec} dim={done} className="h-[120px]" />}
+      {showBigCover && (
         <>
           <div aria-hidden className={clsx("absolute inset-0", done && "opacity-60")}>
-            <CoverBackground cover={spec.cover} accent={accent} />
+            <CoverBackground cover={spec.cover} accent={color} focus={spec.focus} />
           </div>
-          <div aria-hidden className={clsx("absolute inset-0", compact ? "cover-fade" : "cover-fade")} />
+          <div aria-hidden className="cover-fade absolute inset-0" />
         </>
       )}
-      <div className={clsx("relative flex items-center gap-1 pl-1.5 pr-2", compact ? "min-h-[72px] py-1.5" : "min-h-[112px] py-3")}>
-        <CompletionControl card={card} title={spec.title} />
-        <div className="min-w-0 flex-1 py-1 pl-1">
-          <div className="flex min-w-0 items-center gap-2">
-            {/* the title is the real "open details" button; its ::after stretches over the whole card */}
-            <h3 className="min-w-0 flex-1">
-              <button
-                ref={flipRef}
-                type="button"
-                aria-expanded={false}
-                onClick={onFlip}
-                className={clsx("block w-full truncate rounded-md text-left font-semibold leading-snug after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-2xl focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-focus", compact ? "text-[17px]" : "text-lg", done ? "text-muted" : "text-fg")}
-              >
-                {spec.title || "Untitled"}
-                <span className="sr-only">{done ? ", complete" : ""}. Open details</span>
-              </button>
-            </h3>
-            {card.instance.groupId && !compact && <GroupBadge card={card} ws={ws} />}
-          </div>
-          {compact ? (
-            <>
-              {summary && (
-                <p className="truncate text-[15px] leading-snug text-fg/90">
-                  {card.instance.groupId && <span className="mr-1.5 inline-flex align-middle text-muted"><Users size={13} aria-hidden /></span>}
-                  {summary}
-                </p>
-              )}
-              {(time || progText) && (
-                <p className="truncate text-[15px] leading-snug text-muted tabular-nums">{[time, progText].filter(Boolean).join(" · ")}</p>
-              )}
-            </>
+      <div className="relative flex items-stretch">
+        {panel && <ActivityPanel spec={spec} dim={done} className={compact ? "w-[88px]" : "w-[104px]"} />}
+        <div className={clsx("relative flex min-w-0 flex-1 items-center gap-1 pr-2", panel ? "pl-0.5" : "pl-2", compact || cover ? "min-h-[84px] py-1.5" : "min-h-[112px] py-3")}>
+        {/* personal colour for cards without a leading panel: a small fixed detail, independent of progress and completion */}
+        {!panel && <span aria-hidden className="absolute bottom-3 left-0 top-3 w-[3px] rounded-r-full" style={{ background: color }} />}
+        <CompletionControl card={card} title={spec.title} onOpenTracking={() => onFlip({ tracking: true })} />
+        <div className="min-w-0 flex-1 py-1 pl-0.5">
+          {/* the title is the real "open details" button; its ::after stretches over the whole card */}
+          <h3 className="min-w-0">
+            <button
+              ref={flipRef}
+              type="button"
+              aria-expanded={false}
+              onClick={() => onFlip()}
+              className={clsx("block w-full truncate rounded-md text-left font-semibold leading-snug after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-2xl focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-focus", compact || cover ? "text-[17px]" : "text-lg", done ? "text-muted" : "text-fg")}
+            >
+              {spec.title || "Untitled"}
+              <span className="sr-only">{done ? ", complete" : ""}. Open details</span>
+            </button>
+          </h3>
+          {(text.context || text.summary) &&
+            (compact || cover ? (
+              // one line when it fits; a second line only when a detail and a summary are both worth showing
+              <p className="line-clamp-2 text-[15px] leading-snug">
+                {text.context && <span className="font-medium text-fg">{text.context}</span>}
+                {text.context && text.summary && <span aria-hidden className="text-muted"> · </span>}
+                {text.summary && <span className="text-fg/90">{text.summary}</span>}
+              </p>
+            ) : (
+              <p className="mt-1 line-clamp-2 text-[15px] leading-snug text-fg/90">{[text.context, text.summary].filter(Boolean).join(" · ")}</p>
+            ))}
+          {compact || cover ? (
+            pieces.length > 0 && <MetaLine pieces={pieces} />
           ) : (
             <>
-              {time && <p className="mt-0.5 flex items-center gap-1.5 text-[15px] text-muted"><Clock size={14} aria-hidden /> {time}</p>}
-              {summary && <p className="mt-1 line-clamp-2 text-[15px] leading-snug text-fg/90">{summary}</p>}
+              {pieces.length > 0 && <MetaLine pieces={pieces} className="mt-1 text-[15px]" />}
               {showProg && (
-                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <ProgressBar fraction={card.progress.fraction} label={`${spec.title} progress`} accent={accent} className="min-w-24 max-w-[220px] flex-1" />
-                  <span className="inline-flex items-center gap-1.5 text-[15px] text-muted"><ListChecks size={14} aria-hidden /> {summary === card.progress.label ? "" : card.progress.label}{note ? `${summary === card.progress.label ? "" : " · "}${summary === card.progress.label ? note : note.toLowerCase()}` : ""}</span>
+                <div className="mt-2.5 flex items-center gap-3">
+                  <ProgressBar fraction={fp.fraction} label={`${spec.title} progress`} accent={PROGRESS_FILL} className="min-w-24 max-w-[220px] flex-1" />
                 </div>
               )}
             </>
           )}
         </div>
         <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full text-muted"><ChevronDown size={20} /></span>
+        </div>
       </div>
-      {compact && showProg && (
+      {(compact || cover) && showProg && (
         <div aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-line/70">
-          <div className="h-full" style={{ width: `${Math.round(card.progress.fraction * 100)}%`, background: accent }} />
+          <div className="h-full" style={{ width: `${Math.round(fp.fraction * 100)}%`, background: fp.fraction >= 1 ? "var(--color-done)" : PROGRESS_FILL }} />
         </div>
       )}
     </article>
   );
 }
 
-/* ------------------------------------------------------------------ back */
-const Label = ({ children }: { children: React.ReactNode }) => <h4 className="mb-1.5 text-sm font-semibold text-muted">{children}</h4>;
+function Front(p: Props & { onFlip: (o?: FlipOpts) => void; flipRef: React.RefObject<HTMLButtonElement | null> }) {
+  return <CardFront card={p.card} ws={p.ws} onFlip={p.onFlip} flipRef={p.flipRef} />;
+}
 
-function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, onMove, onReschedule, onFlip, flipRef }: Props & { onFlip: () => void; flipRef: React.RefObject<HTMLButtonElement | null> }) {
+/* ------------------------------------------------------------------ back */
+const Label = ({ children }: { children: React.ReactNode }) => <h4 className="mb-1.5 text-sm font-semibold uppercase tracking-wide text-muted">{children}</h4>;
+
+const normText = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
+
+function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, onMove, onReschedule, onFlip, flipRef }: Props & { onFlip: (o?: FlipOpts) => void; flipRef: React.RefObject<HTMLButtonElement | null> }) {
   const { instance: inst } = card;
   const { spec } = inst;
   const act = useApp((s) => s.act);
   const patch = useApp((s) => s.patchProgress);
   const saveCard = useApp((s) => s.saveCard);
+  const [help, setHelp] = useState(false);
   const time = formatTimeRange(spec.time, spec.endTime);
   const group = ws.groups.find((g) => g.id === inst.groupId);
   const derived = spec.completion.mode === "derived";
-  const accent = resolveAccent(spec.accent);
   const nameOf = (id: ID | null) => ws.profiles.find((p) => p.id === id)?.name ?? "Unassigned";
   const rule = ws.series.find((s) => s.id === inst.seriesId);
-  const note = progressNote(card);
+  const counted = relevantBlocks(spec);
+  const countedNames = counted.map((b) => b.title || (b.type === "checklist" ? "Checklist" : "Target"));
+  const firstTracking = spec.blocks.find(isTracking)?.id;
+
+  // never say the same thing twice: the written summary is dropped when a note already carries it
+  const notes = spec.blocks.flatMap((b) => (b.type === "note" ? [normText(b.text)] : []));
+  const sum = normText(spec.summary);
+  const showSummary = !!sum && (!spec.summarySource || spec.summarySource.kind === "text") && !notes.some((n) => n && n.includes(sum));
+  const firstNote = spec.blocks.find((b) => b.type === "note")?.id;
 
   const editSpec = (fn: (blocks: typeof spec.blocks) => typeof spec.blocks) => saveCard(inst, { spec: { ...spec, blocks: fn(spec.blocks) } }, "this");
 
   return (
     <article aria-label={`${spec.title} details`} className="relative overflow-hidden rounded-2xl border border-line bg-surface p-4">
-      <header className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+      {/* the photo carries over to the back as a full-bleed header, so flipping keeps the card recognisable */}
+      {hasImage(spec.cover) && (
+        <div className="relative -mx-4 -mt-4 mb-3">
+          <CoverBanner spec={spec} className="h-36" />
+          <div aria-hidden className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[var(--color-surface)] to-transparent" />
+        </div>
+      )}
+      <header className="flex items-start gap-3">
+        {!hasImage(spec.cover) && <ActivityVisual spec={spec} size={44} />}
+        <div className="min-w-0 flex-1">
           <h3 className="text-xl font-semibold leading-snug">{spec.title || "Untitled"}</h3>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-muted">
             {time && <span className="inline-flex items-center gap-1.5"><Clock size={14} aria-hidden /> {time}</span>}
@@ -277,33 +369,38 @@ function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, on
             {rule && <span className="inline-flex items-center gap-1.5"><Repeat2 size={14} aria-hidden /> Routine</span>}
           </p>
         </div>
-        <IconButton ref={flipRef} label={`Close details for ${spec.title || "card"}`} aria-expanded={true} variant="outline" className="-mr-1 -mt-1" onClick={onFlip}>
+        <IconButton ref={flipRef} label={`Close details for ${spec.title || "card"}`} aria-expanded={true} variant="outline" className="-mr-1 -mt-1" onClick={() => onFlip()}>
           <ChevronUp size={20} />
         </IconButton>
       </header>
 
-      {card.progress.hasTracking && (
-        <div className="mt-3">
-          <div className="mb-1 flex justify-between gap-2 text-[15px]">
-            <span className="font-medium">{card.progress.label}</span>
-            <span className="text-muted">{card.progress.complete ? "Complete" : derived ? "Completes automatically" : (note ?? "")}</span>
+      {derived && (
+        <div className="mt-3 rounded-xl bg-bg/50 px-3 py-2">
+          <div className="flex items-center gap-3">
+            <Ring fraction={card.progress.fraction} complete={card.progress.complete} accent={PROGRESS_FILL} />
+            <p className="min-w-0 flex-1 text-[15px]">
+              <span className="font-medium">{card.progress.complete ? "Complete" : "In progress"}</span>
+              {card.progress.label && <span className="text-muted"> · {card.progress.label}</span>}
+              <span className="block text-sm text-muted">Completes automatically</span>
+            </p>
+            <button type="button" aria-label="How automatic completion works" aria-expanded={help} onClick={() => setHelp(!help)} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:text-fg"><CircleHelp size={18} aria-hidden /></button>
           </div>
-          <ProgressBar fraction={card.progress.fraction} label={`${spec.title} progress`} accent={accent} />
-          {!derived && <p className="mt-1.5 text-sm text-muted">You mark this card done yourself; the list below tracks progress.</p>}
+          {help && <p role="note" className="mt-1 pb-1 text-[15px] leading-snug text-muted">{counted.length ? `Done when ${countedNames.join(" and ")} ${counted.length === 1 ? "is" : "are"} complete. Update the tracking below — the card can’t be ticked by hand. Bars stop at 100%.` : "Add a checklist or target in Edit — until then this card can’t complete."}</p>}
         </div>
       )}
-      {spec.summary && <p className="mt-3 text-[15px] leading-snug text-fg/90">{spec.summary}</p>}
+
+      {showSummary && <p className="mt-3 text-[15px] leading-snug text-fg/90">{spec.summary}</p>}
 
       <div className="mt-4 space-y-5">
         {spec.blocks.length === 0 && <p className="text-[15px] text-muted">Nothing here yet. Use Edit to add notes, a checklist or a target.</p>}
         {spec.blocks.map((b) => {
           if (b.type === "note")
-            return <NoteView key={b.id} title={b.title} text={b.text} canEdit={card.canEdit} onSave={(text) => saveCard(inst, { spec: { ...spec, blocks: spec.blocks.map((x) => (x.id === b.id && x.type === "note" ? { ...x, text } : x)) } }, "this")} />;
+            return <NoteView key={b.id} lead={b.id === firstNote} title={b.title} text={b.text} canEdit={card.canEdit} onSave={(text) => saveCard(inst, { spec: { ...spec, blocks: spec.blocks.map((x) => (x.id === b.id && x.type === "note" ? { ...x, text } : x)) } }, "this")} />;
           if (b.type === "checklist")
             return (
-              <ChecklistView key={b.id} block={b} card={card} onToggle={(itemId, v) => void patch(card, { checks: { [itemId]: v } })} onAdd={card.canEdit ? (text) => void editSpec((bl) => bl.map((x) => (x.id === b.id && x.type === "checklist" ? { ...x, items: [...x.items, { id: uid(), text }] } : x))) : undefined} />
+              <ChecklistView key={b.id} block={b} card={card} first={b.id === firstTracking} onToggle={(itemId, v) => void patch(card, { checks: { [itemId]: v } })} onAdd={card.canEdit ? (text) => void editSpec((bl) => bl.map((x) => (x.id === b.id && x.type === "checklist" ? { ...x, items: [...x.items, { id: uid(), text }] } : x))) : undefined} />
             );
-          if (b.type === "progress") return <ProgressView key={b.id} block={b} card={card} onSet={(v) => void patch(card, { values: { [b.id]: Math.max(0, v) } })} />;
+          if (b.type === "progress") return <ProgressView key={b.id} block={b} card={card} first={b.id === firstTracking} onSet={(v) => void patch(card, { values: { [b.id]: Math.max(0, v) } })} />;
           return <ResponsibilityView key={b.id} block={b} card={card} ws={ws} nameOf={nameOf} onAssign={(aid, uidv) => void editSpec((bl) => bl.map((x) => (x.id === b.id && x.type === "responsibility" ? { ...x, assignments: x.assignments.map((a) => (a.id === aid ? { ...a, userId: uidv } : a)) } : x)))} />;
         })}
       </div>
@@ -326,10 +423,13 @@ function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, on
             type="button"
             aria-pressed={card.progress.complete}
             onClick={() => void patch(card, { completed: !card.progress.complete })}
-            className={clsx("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-[15px] font-semibold", card.progress.complete ? "border border-line hover:bg-surface-2" : "bg-accent text-accent-ink hover:brightness-105")}
+            className={clsx("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-[15px] font-semibold", card.progress.complete ? "border border-done/60 text-done hover:bg-done/10" : "bg-accent text-accent-ink hover:brightness-105")}
           >
-            <Check size={16} aria-hidden /> {card.progress.complete ? "Marked done · undo" : "Mark done"}
+            <Check size={16} aria-hidden /> {card.progress.complete ? "Done · undo" : "Mark done"}
           </button>
+        )}
+        {!derived && card.progress.hasTracking && (
+          <button type="button" aria-label="How completion works" aria-expanded={help} onClick={() => setHelp(!help)} className="grid size-11 place-items-center rounded-full text-muted hover:text-fg"><CircleHelp size={18} aria-hidden /></button>
         )}
         {card.canEdit && (
           <button type="button" onClick={() => onEdit(card)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line px-4 text-[15px] font-medium hover:bg-surface-2">
@@ -377,6 +477,7 @@ function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, on
             </Menu.Portal>
           </Menu.Root>
         </div>
+        {help && !derived && <p role="note" className="basis-full rounded-lg bg-surface-2 px-3 py-2 text-[15px] leading-snug text-muted">You mark this card done yourself. The lists and targets above track progress but never complete it.</p>}
       </footer>
     </article>
   );
@@ -392,7 +493,7 @@ function Item({ children, icon, onSelect, disabled, danger }: { children: React.
 }
 
 /** A note you can edit in place; structural changes (adding/removing blocks) stay in the editor. */
-function NoteView({ title, text, canEdit, onSave }: { title: string; text: string; canEdit: boolean; onSave: (t: string) => Promise<unknown> }) {
+function NoteView({ lead, title, text, canEdit, onSave }: { lead?: boolean; title: string; text: string; canEdit: boolean; onSave: (t: string) => Promise<unknown> }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [busy, setBusy] = useState(false);
@@ -413,7 +514,7 @@ function NoteView({ title, text, canEdit, onSave }: { title: string; text: strin
           </div>
         </div>
       ) : text.trim() ? (
-        <RichText text={text} />
+        <RichText text={text} className={lead ? "text-[17px] text-fg" : undefined} />
       ) : (
         <p className="text-sm text-muted">Empty note</p>
       )}
@@ -422,10 +523,9 @@ function NoteView({ title, text, canEdit, onSave }: { title: string; text: strin
 }
 
 /* ------------------------------------------------------------------ blocks */
-function ChecklistView({ block, card, onToggle, onAdd }: { block: ChecklistBlock; card: DayCard; onToggle: (id: ID, v: boolean) => void; onAdd?: (text: string) => void }) {
+function ChecklistView({ block, card, first, onToggle, onAdd }: { block: ChecklistBlock; card: DayCard; first?: boolean; onToggle: (id: ID, v: boolean) => void; onAdd?: (text: string) => void }) {
   const [adding, setAdding] = useState(false);
   const [text, setText] = useState("");
-  const accent = resolveAccent(card.instance.spec.accent);
   const done = block.items.filter((i) => card.state.checks[i.id]).length;
   const submit = () => {
     if (text.trim()) onAdd?.(text.trim());
@@ -443,9 +543,9 @@ function ChecklistView({ block, card, onToggle, onAdd }: { block: ChecklistBlock
           return (
             <li key={it.id} className="border-b border-line/70 last:border-0">
               <label className={clsx("flex min-h-11 items-center gap-3 py-1", card.canProgress ? "cursor-pointer" : "opacity-80")}>
-                <input type="checkbox" checked={on} disabled={!card.canProgress} onChange={(e) => onToggle(it.id, e.target.checked)} className="peer sr-only" />
-                <span className="grid size-6 shrink-0 place-items-center rounded-full border-2 border-fg/60 peer-checked:border-transparent peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-focus" style={on ? { background: accent } : undefined}>
-                  {on && <Check size={14} strokeWidth={3} className="text-accent-ink" />}
+                <input type="checkbox" checked={on} disabled={!card.canProgress} onChange={(e) => onToggle(it.id, e.target.checked)} {...(first && it.id === block.items[0]?.id ? { "data-track-first": "" } : {})} className="peer sr-only" />
+                <span className="grid size-6 shrink-0 place-items-center rounded-md border-2 border-muted peer-checked:border-done peer-checked:bg-done peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-focus">
+                  {on && <Check size={16} strokeWidth={3.5} className="text-done-ink" />}
                 </span>
                 <span className={clsx("text-[16px]", on && "text-muted line-through decoration-muted/60")}>{it.text}</span>
               </label>
@@ -474,10 +574,10 @@ function ChecklistView({ block, card, onToggle, onAdd }: { block: ChecklistBlock
   );
 }
 
-function ProgressView({ block, card, onSet }: { block: ProgressBlock; card: DayCard; onSet: (v: number) => void }) {
+function ProgressView({ block, card, first, onSet }: { block: ProgressBlock; card: DayCard; first?: boolean; onSet: (v: number) => void }) {
   const value = card.state.values[block.id] ?? 0;
   const [draft, setDraft] = useState<string | null>(null);
-  const accent = resolveAccent(card.instance.spec.accent);
+  const accent = PROGRESS_FILL;
   const complete = blockComplete(block, card.state);
   return (
     <section>
@@ -488,6 +588,7 @@ function ProgressView({ block, card, onSet }: { block: ProgressBlock; card: DayC
         </IconButton>
         <div className="flex min-w-0 flex-1 items-center justify-center gap-2 text-lg">
           <input
+            {...(first ? { "data-track-first": "" } : {})}
             aria-label={`${block.title} value`}
             inputMode="decimal"
             disabled={!card.canProgress}
@@ -533,7 +634,7 @@ function ResponsibilityView({ block, card, ws, nameOf, onAssign }: { block: Resp
                 ))}
               </select>
             ) : (
-              <span className="text-accent">{nameOf(a.userId)}</span>
+              <span className="font-medium text-accent">{nameOf(a.userId)}</span>
             )}
           </li>
         ))}

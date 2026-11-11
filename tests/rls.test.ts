@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
  * Runs the real migrations in an in-process Postgres (PGlite) and exercises the row-level security policies
@@ -43,6 +43,14 @@ beforeAll(async () => {
     create function auth.uid() returns uuid language sql stable as $$ select nullif(auth.jwt() ->> 'sub', '')::uuid $$;
     grant usage on schema auth to anon, authenticated;
     grant execute on all functions in schema auth to anon, authenticated;
+    -- minimal shim of Supabase Storage so the real photo policies can be exercised
+    create schema storage;
+    create table storage.buckets (id text primary key, name text, public boolean default false, file_size_limit bigint, allowed_mime_types text[]);
+    create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid default auth.uid());
+    alter table storage.objects enable row level security;
+    create function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
+    grant usage on schema storage to anon, authenticated;
+    grant select, insert, delete on storage.objects to authenticated; grant select on storage.objects to anon;
   `);
   const dir = join(process.cwd(), "supabase/migrations");
   for (const f of readdirSync(dir).sort()) await db.exec(readFileSync(join(dir, f), "utf8"));
@@ -64,6 +72,69 @@ beforeAll(async () => {
     await q("insert into card_instances (id, owner_id, date, spec) values ($1, $2, '2026-11-10', $3)", [PRIV, A, spec]);
     await q("insert into card_instances (id, owner_id, group_id, date, spec, completion_mode) values ($1, $2, $3, '2026-11-10', $4, 'individual')", [SHARED_I, A, G, spec]);
     await q("insert into card_instances (id, owner_id, group_id, date, spec, completion_mode) values ($1, $2, $3, '2026-11-10', $4, 'together')", [SHARED_T, A, G, spec]);
+  });
+});
+
+describe("RLS: private card photos", () => {
+  const privPath = `${A}/priv.jpg`;
+  const sharedPath = `${A}/shared.jpg`;
+  const loosePath = `${A}/loose.jpg`;
+  const put = (path: string) => q("insert into storage.objects (bucket_id, name) values ('card-images', $1)", [path]);
+  const visibleTo = async (u: string | null, path: string) => as(u, async () => (await q("select name from storage.objects where name = $1", [path])).rows.length === 1);
+
+  beforeAll(async () => {
+    await as(A, async () => {
+      await put(privPath);
+      await put(sharedPath);
+      await put(loosePath);
+      // dedicated fixture cards, so other suites' cards (and their rev counters) are untouched
+      await q("insert into card_instances (id, owner_id, date, spec) values ($1, $2, '2026-11-12', $3)", ["20000000-0000-4000-8000-0000000000a1", A, JSON.stringify({ title: "p", blocks: [], cover: { kind: "upload", path: privPath } })]);
+      await q("insert into card_instances (id, owner_id, group_id, date, spec) values ($1, $2, $3, '2026-11-12', $4)", ["20000000-0000-4000-8000-0000000000a2", A, G, JSON.stringify({ title: "s", blocks: [], cover: { kind: "upload", path: sharedPath } })]);
+    });
+  });
+
+  afterAll(async () => {
+    await as(A, async () => void (await q("delete from card_instances where id in ('20000000-0000-4000-8000-0000000000a1', '20000000-0000-4000-8000-0000000000a2')")));
+  });
+
+  it("the bucket is private and capped", async () => {
+    const r = await q("select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'card-images'");
+    expect(r.rows[0]).toMatchObject({ public: false, file_size_limit: 2097152 });
+  });
+  it("the uploader can always read their own photos", async () => {
+    for (const p of [privPath, sharedPath, loosePath]) expect(await visibleTo(A, p)).toBe(true);
+  });
+  it("a photo on a private card (or on no card) is invisible to everyone else, even with the exact path", async () => {
+    for (const u of [B, C, D, null]) {
+      expect(await visibleTo(u, privPath)).toBe(false);
+      expect(await visibleTo(u, loosePath)).toBe(false);
+    }
+  });
+  it("a photo used by a group card is readable by members only (editor and viewer), not outsiders", async () => {
+    expect(await visibleTo(B, sharedPath)).toBe(true);
+    expect(await visibleTo(C, sharedPath)).toBe(true);
+    expect(await visibleTo(D, sharedPath)).toBe(false);
+    expect(await visibleTo(null, sharedPath)).toBe(false);
+  });
+  it("deleting the card closes everyone else’s access again", async () => {
+    const TMP = "20000000-0000-4000-8000-000000000009";
+    const tmpPath = `${A}/tmp.jpg`;
+    await as(A, async () => {
+      await put(tmpPath);
+      await q("insert into card_instances (id, owner_id, group_id, date, spec) values ($1, $2, $3, '2026-11-11', $4)", [TMP, A, G, JSON.stringify({ title: "t", blocks: [], cover: { kind: "upload", path: tmpPath } })]);
+    });
+    expect(await visibleTo(B, tmpPath)).toBe(true);
+    await as(A, async () => void (await q("delete from card_instances where id = $1", [TMP])));
+    expect(await visibleTo(B, tmpPath)).toBe(false);
+    expect(await visibleTo(A, tmpPath)).toBe(true);
+  });
+  it("people can only upload into their own folder, and only the owner can delete", async () => {
+    await as(B, async () => {
+      await denied(put(`${A}/evil.jpg`));
+      await put(`${B}/mine.jpg`);
+    });
+    await as(B, async () => expect((await q("delete from storage.objects where name = $1 returning name", [sharedPath])).rows).toHaveLength(0));
+    await as(D, async () => await denied(put(`${B}/x.jpg`)));
   });
 });
 

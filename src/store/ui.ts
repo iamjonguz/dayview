@@ -20,6 +20,10 @@ interface UiState {
   /** Group completed cards into a collapsed "Done" section (persisted per device). */
   collapseDone: boolean;
   setCollapseDone(b: boolean): void;
+  /** One-shot request for a dated card to open itself (deep links). Consumed by the card that matches. */
+  openTarget: { id: ID; nonce: number } | null;
+  requestOpen(id: ID): void;
+  consumeTarget(nonce: number): void;
   editor: EditorTarget;
   searchOpen: boolean;
   setSearchOpen(o: boolean): void;
@@ -35,6 +39,9 @@ export const useUi = create<UiState>((set) => ({
     } catch {}
     set({ collapseDone });
   },
+  openTarget: null,
+  requestOpen: (id) => set({ openTarget: { id, nonce: Date.now() + Math.random() } }),
+  consumeTarget: (nonce) => set((s) => (s.openTarget?.nonce === nonce ? { openTarget: null } : s)),
   editor: null,
   searchOpen: false,
   setSearchOpen: (searchOpen) => set({ searchOpen }),

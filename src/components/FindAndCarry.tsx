@@ -1,4 +1,5 @@
 "use client";
+import { dayHref } from "@/lib/ui/links";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -91,7 +92,6 @@ export function SearchSheet() {
   const open = useUi((s) => s.searchOpen);
   const setOpen = useUi((s) => s.setSearchOpen);
   const planner = useApp((s) => s.planner);
-  const setDate = useApp((s) => s.setDate);
   const router = useRouter();
   const [q, setQ] = useState("");
   const [res, setRes] = useState<CardInstance[] | null>(null);
@@ -115,7 +115,7 @@ export function SearchSheet() {
           <ul className="divide-y divide-line">
             {res.map((i) => (
               <li key={i.id}>
-                <button className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl px-2 text-left hover:bg-surface-2" onClick={() => { void setDate(i.date); router.push("/"); setOpen(false); }}>
+                <button className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl px-2 text-left hover:bg-surface-2" onClick={() => { router.push(dayHref(i.date, i.id)); setOpen(false); }}>
                   <span>{i.spec.title}{i.spec.summary && <span className="ml-2 text-sm text-muted">{i.spec.summary}</span>}</span>
                   <span className="shrink-0 text-sm text-accent">{formatShort(i.date)}</span>
                 </button>

@@ -56,9 +56,10 @@ export function starterTemplates(): CardTemplate[] {
         cover: { kind: "preset", id: "plate" },
         front: { showTime: true, showSummary: true, showProgress: false }, // ingredients are incidental
         blocks: [
+          // practical information first; ingredient readiness comes last and never decides whether dinner is done
           newBlock.note("Tonight’s plan", "Baked salmon with rice and broccoli."),
-          dinnerChecklist,
           newBlock.note("Preparation", "Start the rice at 18:00."),
+          dinnerChecklist,
         ],
       }),
     ),

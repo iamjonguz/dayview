@@ -21,6 +21,7 @@ export async function seedDemo(p: Planner) {
   const workSpec: CardSpec = {
     ...work,
     summary: "Focus time",
+    context: "Atlas redesign",
     summarySource: { kind: "next-item", blockId: workList.id },
     blocks: [workList, newBlock.note("Notes", "Send the draft before **15:00**.")],
   };
@@ -32,8 +33,8 @@ export async function seedDemo(p: Planner) {
     cover: { kind: "preset", id: "soup" },
     blocks: [lunchList],
   });
-  const exercise = tpl("starter-exercise");
-  const reading = tpl("starter-reading");
+  const exercise = { ...tpl("starter-exercise"), context: "Lakeside route", summary: "30 minutes" };
+  const reading = { ...tpl("starter-reading"), context: "The Overstory", summary: "Chapter 6 tonight", summarySource: undefined };
   const everyDay = { kind: "daily" as const, weekdays: [] };
   const sec = (name: string) => p.ws.sections.find((s) => s.name === name)?.id ?? null;
 
@@ -50,7 +51,13 @@ export async function seedDemo(p: Planner) {
   cook.assignments[1].userId = "demo-erik";
   await p.createCard({
     date: today,
-    spec: { ...dinner, blocks: [dinner.blocks[0], cook, ...dinner.blocks.slice(1)] },
+    spec: {
+      ...dinner,
+      style: "cover" as const,
+      summarySource: { kind: "note" as const, blockId: dinner.blocks[0].id },
+      front: { ...dinner.front, showPeople: true, personAssignmentId: cook.assignments[0].id },
+      blocks: [dinner.blocks[0], cook, ...dinner.blocks.slice(1)],
+    },
     groupId: DEMO_FAMILY,
     completionMode: "together",
     sectionId: sec("Evening"),

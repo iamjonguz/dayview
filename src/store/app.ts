@@ -2,6 +2,8 @@
 import { create } from "zustand";
 import { browserTimezone, addDays } from "@/lib/domain/dates";
 import { LocalRepo, browserKV, DEMO_ME } from "@/lib/data/local";
+import { clearImageCache } from "@/lib/ui/imageCache";
+import { indexedDbImageStore } from "@/lib/data/imageStore";
 import { Planner, type CreateInput, type EditScope } from "@/lib/data/planner";
 import { SupabaseRepo } from "@/lib/data/supabase";
 import { seedDemo } from "@/lib/data/seed";
@@ -76,7 +78,7 @@ export const useApp = create<AppState>((set, get) => {
       if (!data.session) return "needs-auth";
       return new SupabaseRepo(sb);
     }
-    const repo = new LocalRepo(browserKV(DB_KEY), browserTimezone());
+    const repo = new LocalRepo(browserKV(DB_KEY), browserTimezone(), indexedDbImageStore());
     try {
       const a = localStorage.getItem(ACTOR_KEY);
       if (a && repo.read().users.some((u) => u.id === a)) repo.actingUserId = a;
@@ -315,6 +317,7 @@ export const useApp = create<AppState>((set, get) => {
         localStorage.setItem(ACTOR_KEY, id);
       } catch {}
       unsub?.();
+      clearImageCache();
       set({ phase: "booting", data: null, view: null });
       await get().boot();
     },

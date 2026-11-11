@@ -133,7 +133,7 @@ function EditorSheet({ inst, onClose }: { inst?: CardInstance; onClose: () => vo
             </Field>
           )}
 
-          <SpecEditor spec={spec} onChange={setSpec} />
+          <SpecEditor spec={spec} onChange={setSpec} groupId={groupId} />
 
           <Disclosure title="Schedule" summary={isEdit && !isRoutineDay ? "One-off" : repeat.kind === "once" ? "Just once" : repeat.kind === "daily" ? "Every day" : "Selected days"}>
             {isEdit && !isRoutineDay ? (
