@@ -28,6 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => void boot(), [boot]);
 
   if (phase === "needs-auth") return <><AuthPanel /><Toasts /></>;
+  if (phase === "recovery") return <><AuthPanel recovery /><Toasts /></>;
   if (phase === "error")
     return (
       <main className="grid min-h-dvh place-items-center p-6">
