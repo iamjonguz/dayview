@@ -21,7 +21,7 @@ export interface Toast {
   action?: { label: string; run: () => void | Promise<void> };
 }
 
-type Phase = "booting" | "needs-auth" | "ready" | "error";
+type Phase = "booting" | "needs-auth" | "recovery" | "ready" | "error";
 
 interface AppState {
   phase: Phase;
@@ -41,6 +41,8 @@ interface AppState {
   boot(): Promise<void>;
   bootInner(): Promise<void>;
   signOut(): Promise<void>;
+  /** Finishes a password reset: sets the new password, then opens the app. */
+  finishRecovery(password: string): Promise<string | null>;
   setDate(d: DateStr): Promise<void>;
   shiftDate(n: number): Promise<void>;
   refresh(opts?: { silent?: boolean }): Promise<void>;
@@ -71,9 +73,26 @@ export const useApp = create<AppState>((set, get) => {
     return planner!.view(data);
   };
 
+  // A password-reset link signs the person in with a short "recovery" session. They must choose a new password
+  // before entering the app, so we hold the app back until they have.
+  let recovering = false;
+  let recoveryWatched = false;
+  function watchRecovery(sb: NonNullable<ReturnType<typeof getSupabase>>) {
+    if (typeof window !== "undefined" && /type=recovery/.test(window.location.hash)) recovering = true;
+    if (recoveryWatched) return;
+    recoveryWatched = true;
+    sb.auth.onAuthStateChange((evt) => {
+      if (evt === "PASSWORD_RECOVERY") {
+        recovering = true;
+        set({ phase: "recovery" });
+      }
+    });
+  }
+
   async function makeRepo(): Promise<Repo | "needs-auth"> {
     if (supabaseConfigured) {
       const sb = getSupabase()!;
+      watchRecovery(sb);
       const { data } = await sb.auth.getSession();
       if (!data.session) return "needs-auth";
       return new SupabaseRepo(sb);
@@ -108,6 +127,10 @@ export const useApp = create<AppState>((set, get) => {
     async bootInner() {
       try {
         const repo = await makeRepo();
+        if (recovering) {
+          set({ phase: "recovery" });
+          return;
+        }
         if (repo === "needs-auth") {
           set({ phase: "needs-auth" });
           getSupabase()!.auth.onAuthStateChange((evt) => {
@@ -150,6 +173,14 @@ export const useApp = create<AppState>((set, get) => {
       }
     },
 
+    async finishRecovery(password) {
+      const { error } = await getSupabase()!.auth.updateUser({ password });
+      if (error) return error.message;
+      recovering = false;
+      if (typeof window !== "undefined") window.history.replaceState(null, "", window.location.pathname);
+      await get().boot();
+      return null;
+    },
     async signOut() {
       await getSupabase()?.auth.signOut();
     },
