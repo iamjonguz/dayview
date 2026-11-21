@@ -8,6 +8,7 @@ import { formatLong } from "@/lib/domain/dates";
 import { describeRule } from "@/lib/domain/recurrence";
 import { canEditRole, roleIn } from "@/lib/domain/permissions";
 import type { CardInstance, CardSpec, CompletionMode, ID } from "@/lib/domain/types";
+import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app";
 import { useUi } from "@/store/ui";
 import { RepeatEditor, repeatToRule, ruleToRepeat, type RepeatValue } from "./RepeatEditor";
@@ -25,6 +26,7 @@ export function CardEditorHost() {
 }
 
 function EditorSheet({ inst, onClose }: { inst?: CardInstance; onClose: () => void }) {
+  const t = useT();
   const editor = useUi((s) => s.editor)!;
   const ws = useApp((s) => s.ws)!;
   const date = useApp((s) => s.date);
@@ -36,8 +38,8 @@ function EditorSheet({ inst, onClose }: { inst?: CardInstance; onClose: () => vo
   const initialSpec = useMemo<CardSpec>(() => {
     if (inst) return cloneSpec(inst.spec, false);
     if (editor.kind === "create" && editor.templateId) {
-      const t = ws.templates.find((x) => x.id === editor.templateId);
-      if (t) return cloneSpec(t.spec);
+      const tpl = ws.templates.find((x) => x.id === editor.templateId);
+      if (tpl) return cloneSpec(tpl.spec);
     }
     return newCardSpec();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -64,11 +66,11 @@ function EditorSheet({ inst, onClose }: { inst?: CardInstance; onClose: () => vo
   const [picked, setPicked] = useState<string>(editor.kind === "create" ? (editor.templateId ?? "") : "");
 
   const validate = () => {
-    if (!spec.title.trim()) return "Give the card a title.";
-    if (spec.completion.mode === "derived" && spec.completion.blockIds.length === 0) return "Choose which checklist or target completes this card, or switch to manual completion.";
-    if (repeat.kind === "weekdays" && repeat.weekdays.length === 0) return "Pick at least one day to repeat on.";
-    if (repeat.end && repeat.end < targetDate) return "The end date is before the start date.";
-    if (repeating && groupId) return "Routines are personal. Turn off repeating to share this card.";
+    if (!spec.title.trim()) return t("Give the card a title.");
+    if (spec.completion.mode === "derived" && spec.completion.blockIds.length === 0) return t("Choose which checklist or target completes this card, or switch to manual completion.");
+    if (repeat.kind === "weekdays" && repeat.weekdays.length === 0) return t("Pick at least one day to repeat on.");
+    if (repeat.end && repeat.end < targetDate) return t("The end date is before the start date.");
+    if (repeating && groupId) return t("Routines are personal. Turn off repeating to share this card.");
     return null;
   };
 
@@ -113,42 +115,42 @@ function EditorSheet({ inst, onClose }: { inst?: CardInstance; onClose: () => vo
         full
         onOpenChange={(o) => !o && onClose()}
         wide
-        title={isEdit ? "Edit card" : "New card"}
-        description={isEdit ? `${formatLong(inst!.date)}${isRoutineDay ? " · part of a routine" : ""}` : formatLong(targetDate)}
+        title={isEdit ? t("Edit card") : t("New card")}
+        description={isEdit ? `${formatLong(inst!.date)}${isRoutineDay ? " · " + t("part of a routine") : ""}` : formatLong(targetDate)}
         footer={
           <>
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" disabled={saving} onClick={onSave} className="min-w-28">{saving ? "Saving…" : isEdit ? "Save" : "Add card"}</Button>
+            <Button variant="outline" onClick={onClose}>{t("Cancel")}</Button>
+            <Button variant="primary" disabled={saving} onClick={onSave} className="min-w-28">{saving ? t("Saving…") : isEdit ? t("Save") : t("Add card")}</Button>
           </>
         }
       >
         <div className="space-y-6">
           {error && <p role="alert" className="rounded-xl border border-danger/60 bg-surface-2 p-3 text-[15px] text-danger">{error}</p>}
           {!isEdit && (
-            <Field label="Start from" htmlFor="tpl">
-              <select id="tpl" className={inputCls} value={picked} onChange={(e) => { setPicked(e.target.value); const t = ws.templates.find((x) => x.id === e.target.value); setSpec(t ? cloneSpec(t.spec) : newCardSpec()); }}>
-                <option value="">Blank card</option>
-                {ws.templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.ownerId ? "" : " (starter)"}</option>)}
+            <Field label={t("Start from")} htmlFor="tpl">
+              <select id="tpl" className={inputCls} value={picked} onChange={(e) => { setPicked(e.target.value); const tpl = ws.templates.find((x) => x.id === e.target.value); setSpec(tpl ? cloneSpec(tpl.spec) : newCardSpec()); }}>
+                <option value="">{t("Blank card")}</option>
+                {ws.templates.map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}{tpl.ownerId ? "" : ` (${t("starter")})`}</option>)}
               </select>
             </Field>
           )}
 
           <SpecEditor spec={spec} onChange={setSpec} groupId={groupId} />
 
-          <Disclosure title="Schedule" summary={isEdit && !isRoutineDay ? "One-off" : repeat.kind === "once" ? "Just once" : repeat.kind === "daily" ? "Every day" : "Selected days"}>
+          <Disclosure title={t("Schedule")} summary={isEdit && !isRoutineDay ? t("One-off") : repeat.kind === "once" ? t("Just once") : repeat.kind === "daily" ? t("Every day") : t("Selected days")}>
             {isEdit && !isRoutineDay ? (
-              <p className="text-[15px] text-muted">{inst!.groupId ? "Shared cards belong to a single day." : "This is a one-off card. Use “Move to another day” on the card to reschedule it."}</p>
+              <p className="text-[15px] text-muted">{inst!.groupId ? t("Shared cards belong to a single day.") : t("This is a one-off card. Use “Move to another day” on the card to reschedule it.")}</p>
             ) : (
               <>
-                {isRoutineDay && series && <p className="text-[15px] text-muted">Currently {describeRule(series.rule).toLowerCase()}. Schedule changes apply to this and future occurrences.</p>}
-                <RepeatEditor value={repeat} onChange={setRepeat} allowOnce={!isRoutineDay} startLabel={`Starts ${formatLong(targetDate)}.`} />
+                {isRoutineDay && series && <p className="text-[15px] text-muted">{t("Currently {rule}. Schedule changes apply to this and future occurrences.", { rule: describeRule(series.rule).toLowerCase() })}</p>}
+                <RepeatEditor value={repeat} onChange={setRepeat} allowOnce={!isRoutineDay} startLabel={t("Starts {date}.", { date: formatLong(targetDate) })} />
               </>
             )}
             {!isEdit && (
-              <Field label="Section" htmlFor="sec">
+              <Field label={t("Section")} htmlFor="sec">
                 <select id="sec" className={inputCls} value={sectionId === undefined ? "auto" : (sectionId ?? "none")} onChange={(e) => setSectionId(e.target.value === "auto" ? undefined : e.target.value === "none" ? null : e.target.value)}>
-                  <option value="auto">Automatic (by time)</option>
-                  <option value="none">Anytime</option>
+                  <option value="auto">{t("Automatic (by time)")}</option>
+                  <option value="none">{t("Anytime")}</option>
                   {ws.sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </Field>
@@ -156,25 +158,25 @@ function EditorSheet({ inst, onClose }: { inst?: CardInstance; onClose: () => vo
           </Disclosure>
 
           {canChangeSharing && (
-            <Disclosure title="Sharing" summary={groupId ? (ws.groups.find((g) => g.id === groupId)?.name ?? "Shared") : "Private"}>
+            <Disclosure title={t("Sharing")} summary={groupId ? (ws.groups.find((g) => g.id === groupId)?.name ?? t("Shared")) : t("Private")}>
               {shareable.length === 0 ? (
-                <p className="text-[15px] text-muted">Create a group in the Groups tab to share cards.</p>
+                <p className="text-[15px] text-muted">{t("Create a group in the Groups tab to share cards.")}</p>
               ) : (
                 <>
                   <div className="flex flex-wrap items-center">
-                    <p className="mr-auto text-sm font-medium text-muted">Share with</p>
-                    <Help label="About sharing">Cards are private unless you share them. Shared cards appear for every member, and each person arranges them in their own day. Routines are personal; share a single day’s card instead.</Help>
+                    <p className="mr-auto text-sm font-medium text-muted">{t("Share with")}</p>
+                    <Help label={t("About sharing")}>{t("Cards are private unless you share them. Shared cards appear for every member, and each person arranges them in their own day. Routines are personal; share a single day’s card instead.")}</Help>
                   </div>
-                  <select aria-label="Share with group" className={inputCls} value={groupId ?? ""} disabled={repeating} onChange={(e) => setGroupId(e.target.value || null)}>
-                    <option value="">Private (only me)</option>
+                  <select aria-label={t("Share with group")} className={inputCls} value={groupId ?? ""} disabled={repeating} onChange={(e) => setGroupId(e.target.value || null)}>
+                    <option value="">{t("Private (only me)")}</option>
                     {shareable.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
-                  {repeating && <p className="text-sm text-muted">Turn off repeating to share this card.</p>}
+                  {repeating && <p className="text-sm text-muted">{t("Turn off repeating to share this card.")}</p>}
                   {groupId && (
                     <div className="space-y-1.5">
-                      <p className="text-sm font-medium text-muted">Completion</p>
-                      <Segmented label="Shared completion" value={mode} onChange={setMode} options={[{ value: "together", label: "Complete together" }, { value: "individual", label: "Each person completes" }]} />
-                      <p className="text-sm text-muted">{mode === "together" ? "One shared state for everyone." : "Everyone keeps their own progress."}</p>
+                      <p className="text-sm font-medium text-muted">{t("Completion")}</p>
+                      <Segmented label={t("Shared completion")} value={mode} onChange={setMode} options={[{ value: "together", label: t("Complete together") }, { value: "individual", label: t("Each person completes") }]} />
+                      <p className="text-sm text-muted">{mode === "together" ? t("One shared state for everyone.") : t("Everyone keeps their own progress.")}</p>
                     </div>
                   )}
                 </>
@@ -184,27 +186,27 @@ function EditorSheet({ inst, onClose }: { inst?: CardInstance; onClose: () => vo
 
           <div className="space-y-3">
             {tplName === null ? (
-              <Button variant="ghost" className="-ml-3" onClick={() => setTplName(spec.title)}>Save as template…</Button>
+              <Button variant="ghost" className="-ml-3" onClick={() => setTplName(spec.title)}>{t("Save as template…")}</Button>
             ) : (
               <form
                 className="flex gap-2"
                 onSubmit={async (e) => {
                   e.preventDefault();
-                  const r = await act((p) => p.saveTemplate(tplName, spec), { done: "Template saved" });
+                  const r = await act((p) => p.saveTemplate(tplName, spec), { done: t("Template saved") });
                   if (r.ok) setTplName(null);
                 }}
               >
-                <input aria-label="Template name" className={inputCls} value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="Template name" autoFocus />
-                <Button type="submit">Save</Button>
-                <Button type="button" variant="ghost" onClick={() => setTplName(null)}>Cancel</Button>
+                <input aria-label={t("Template name")} className={inputCls} value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder={t("Template name")} autoFocus />
+                <Button type="submit">{t("Save")}</Button>
+                <Button type="button" variant="ghost" onClick={() => setTplName(null)}>{t("Cancel")}</Button>
               </form>
             )}
           </div>
 
           {isEdit && inst && (inst.ownerId === ws.me.id || canEditRole(roleIn(ws.members, inst.groupId, ws.me.id))) && (
-            <section aria-label="Danger zone" className="mt-2 rounded-xl border border-danger/40 p-4">
-              <p className="mb-3 text-[15px] text-muted">Removing a card can’t be undone from here.</p>
-              <Button variant="danger" onClick={() => setDeleteOpen(true)}><Trash2 size={16} aria-hidden /> Delete card…</Button>
+            <section aria-label={t("Danger zone")} className="mt-2 rounded-xl border border-danger/40 p-4">
+              <p className="mb-3 text-[15px] text-muted">{t("Removing a card can’t be undone from here.")}</p>
+              <Button variant="danger" onClick={() => setDeleteOpen(true)}><Trash2 size={16} aria-hidden /> {t("Delete card…")}</Button>
             </section>
           )}
         </div>
@@ -215,24 +217,24 @@ function EditorSheet({ inst, onClose }: { inst?: CardInstance; onClose: () => vo
         <AlertDialog.Portal>
           <AlertDialog.Overlay className="fixed inset-0 z-[60] bg-black/70" />
           <AlertDialog.Content className="sheet-in fixed left-1/2 top-1/2 z-[70] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-line bg-surface p-6 shadow-lg outline-none">
-            <AlertDialog.Title className="text-xl font-semibold">Apply this change to…</AlertDialog.Title>
-            <AlertDialog.Description className="mt-1 text-sm text-muted">This card belongs to a routine. Past days always keep what happened on them.</AlertDialog.Description>
-            <div role="radiogroup" aria-label="Scope of change" className="mt-4 space-y-2">
+            <AlertDialog.Title className="text-xl font-semibold">{t("Apply this change to…")}</AlertDialog.Title>
+            <AlertDialog.Description className="mt-1 text-sm text-muted">{t("This card belongs to a routine. Past days always keep what happened on them.")}</AlertDialog.Description>
+            <div role="radiogroup" aria-label={t("Scope of change")} className="mt-4 space-y-2">
               {(
                 [
-                  ["this", "This day only", `Only ${formatLong(inst?.date ?? date)} changes.`],
-                  ["future", "This and future occurrences", "The routine changes from this day on, including any schedule change."],
+                  ["this", t("This day only"), t("Only {date} changes.", { date: formatLong(inst?.date ?? date) })],
+                  ["future", t("This and future occurrences"), t("The routine changes from this day on, including any schedule change.")],
                 ] as const
-              ).map(([v, t, d]) => (
+              ).map(([v, label, d]) => (
                 <label key={v} className={`flex cursor-pointer gap-3 rounded-2xl border p-3 ${scope === v ? "border-accent bg-surface" : "border-line"}`}>
                   <input type="radio" name="scope" className="mt-1 accent-[var(--color-accent)]" checked={scope === v} onChange={() => setScope(v)} />
-                  <span><span className="block font-medium">{t}</span><span className="text-sm text-muted">{d}</span></span>
+                  <span><span className="block font-medium">{label}</span><span className="text-sm text-muted">{d}</span></span>
                 </label>
               ))}
             </div>
             <div className="mt-6 flex justify-end gap-2">
-              <AlertDialog.Cancel asChild><Button>Back</Button></AlertDialog.Cancel>
-              <Button variant="primary" onClick={() => { setScopeOpen(false); void doSave(scope); }}>Save</Button>
+              <AlertDialog.Cancel asChild><Button>{t("Back")}</Button></AlertDialog.Cancel>
+              <Button variant="primary" onClick={() => { setScopeOpen(false); void doSave(scope); }}>{t("Save")}</Button>
             </div>
           </AlertDialog.Content>
         </AlertDialog.Portal>
@@ -242,12 +244,12 @@ function EditorSheet({ inst, onClose }: { inst?: CardInstance; onClose: () => vo
       <Confirm
         open={conflict}
         onOpenChange={setConflict}
-        title="This card changed while you were editing"
-        description="Someone else saved a newer version, so yours wasn’t applied. You can keep editing and review the latest, or overwrite it with your version."
-        confirmLabel="Overwrite with mine"
+        title={t("This card changed while you were editing")}
+        description={t("Someone else saved a newer version, so yours wasn’t applied. You can keep editing and review the latest, or overwrite it with your version.")}
+        confirmLabel={t("Overwrite with mine")}
         onConfirm={async () => {
           const latest = useApp.getState().data?.instances.find((i) => i.id === inst!.id);
-          if (!latest) return useApp.getState().toast("The card no longer exists.", { kind: "error" });
+          if (!latest) return useApp.getState().toast(t("The card no longer exists."), { kind: "error" });
           const r = await saveCard(latest, { spec: { ...spec, title: spec.title.trim() }, groupId: canChangeSharing ? groupId : undefined, completionMode: groupId ? mode : undefined }, "this");
           if (r.ok) onClose();
         }}
@@ -259,33 +261,34 @@ function EditorSheet({ inst, onClose }: { inst?: CardInstance; onClose: () => vo
 }
 
 export function RoutineDelete({ open, onOpenChange, inst, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; inst: CardInstance; onDone?: () => void }) {
+  const t = useT();
   const act = useApp((s) => s.act);
   const [choice, setChoice] = useState<"this" | "future">("this");
   return (
     <Confirm
       open={open}
       onOpenChange={onOpenChange}
-      title={`Remove “${inst.spec.title}”?`}
-      confirmLabel={choice === "this" ? "Skip this day" : "End routine here"}
-      description="This card belongs to a routine."
+      title={t("Remove “{title}”?", { title: inst.spec.title })}
+      confirmLabel={choice === "this" ? t("Skip this day") : t("End routine here")}
+      description={t("This card belongs to a routine.")}
       onConfirm={async () => {
         const r = await act((p) => p.deleteCard(inst, choice), {
-          done: choice === "this" ? "Skipped for this day" : "Routine ended",
+          done: choice === "this" ? t("Skipped for this day") : t("Routine ended"),
           undo: choice === "this" ? () => useApp.getState().planner!.setSkipped(inst.id, inst.date, false) : undefined,
         });
         if (r.ok) onDone?.();
       }}
     >
-      <div role="radiogroup" aria-label="What to remove" className="mt-4 space-y-2">
+      <div role="radiogroup" aria-label={t("What to remove")} className="mt-4 space-y-2">
         {(
           [
-            ["this", "Skip this day only", "The routine stays. Skipping is not a failure."],
-            ["future", "End the routine from this day", "Removes this and future occurrences. Past days stay as they are."],
+            ["this", t("Skip this day only"), t("The routine stays. Skipping is not a failure.")],
+            ["future", t("End the routine from this day"), t("Removes this and future occurrences. Past days stay as they are.")],
           ] as const
-        ).map(([v, t, d]) => (
+        ).map(([v, label, d]) => (
           <label key={v} className={`flex cursor-pointer gap-3 rounded-2xl border p-3 ${choice === v ? "border-accent bg-surface" : "border-line"}`}>
             <input type="radio" name="del" className="mt-1 accent-[var(--color-accent)]" checked={choice === v} onChange={() => setChoice(v)} />
-            <span><span className="block font-medium">{t}</span><span className="text-sm text-muted">{d}</span></span>
+            <span><span className="block font-medium">{label}</span><span className="text-sm text-muted">{d}</span></span>
           </label>
         ))}
       </div>
@@ -295,6 +298,7 @@ export function RoutineDelete({ open, onOpenChange, inst, onDone }: { open: bool
 
 /** Delete flow for any card: routine days offer skip / end-routine; one-offs and shared cards confirm with undo. */
 export function DeleteCardDialog({ open, onOpenChange, inst, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; inst: CardInstance; onDone?: () => void }) {
+  const t = useT();
   const ws = useApp((s) => s.ws)!;
   const act = useApp((s) => s.act);
   const isRoutineDay = !!inst.seriesId && !inst.groupId && ws.series.some((s) => s.id === inst.seriesId);
@@ -303,13 +307,13 @@ export function DeleteCardDialog({ open, onOpenChange, inst, onDone }: { open: b
     <Confirm
       open={open}
       onOpenChange={onOpenChange}
-      title={`Delete “${inst.spec.title}”?`}
-      description={inst.groupId ? "This removes the card for everyone in the group, including their progress." : "This removes the card and its progress."}
+      title={t("Delete “{title}”?", { title: inst.spec.title })}
+      description={inst.groupId ? t("This removes the card for everyone in the group, including their progress.") : t("This removes the card and its progress.")}
       onConfirm={async () => {
         const planner = useApp.getState().planner!;
         const progress = (await planner.repo.loadDay(inst.date)).progress.filter((p) => p.instanceId === inst.id);
         const r = await act((p) => p.deleteCard(inst), {
-          done: `Deleted “${inst.spec.title}”`,
+          done: t("Deleted “{title}”", { title: inst.spec.title }),
           undo: async () => {
             await planner.repo.createInstance(inst);
             for (const rec of progress) await planner.repo.patchProgress(inst.id, rec.scope, rec.state);

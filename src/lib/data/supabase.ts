@@ -25,14 +25,15 @@ import {
 } from "../domain/types";
 import { browserTimezone } from "../domain/dates";
 import type { ProgressPatch, Repo } from "./repo";
+import { t as tt } from "../i18n";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
 
 const fail = (e: { code?: string; message: string } | null): never => {
   if (e?.code === "42501" || /row-level security|permission denied|not valid for this account|only the creator/i.test(e?.message ?? ""))
-    throw new PermissionError(e?.message.includes("creator") ? "Only the person who created a card can change who it's shared with." : undefined);
-  throw new Error(e?.message ?? "Request failed");
+    throw new PermissionError(e?.message.includes("creator") ? tt("Only the person who created a card can change who it's shared with.") : undefined);
+  throw new Error(e?.message ?? tt("Request failed"));
 };
 const ok = <T>(r: { data: T; error: any }): T => (r.error ? fail(r.error) : r.data);
 
@@ -84,10 +85,10 @@ export class SupabaseRepo implements Repo {
   /** Photos go in a private bucket under the uploader's id; reads use short-lived signed URLs (never public links). */
   async putImage(blob: Blob): Promise<string> {
     if (!this.userId) this.userId = (await this.sb.auth.getUser()).data.user?.id ?? "";
-    if (!this.userId) throw new Error("Not signed in");
+    if (!this.userId) throw new Error(tt("Not signed in"));
     const path = `${this.userId}/${uid()}.jpg`;
     const { error } = await this.sb.storage.from(IMAGE_BUCKET).upload(path, blob, { contentType: "image/jpeg", cacheControl: "3600", upsert: false });
-    if (error) throw new Error(/bucket.*not found/i.test(error.message) ? "Photo storage isn’t set up yet (see the README: Photo storage)." : error.message);
+    if (error) throw new Error(/bucket.*not found/i.test(error.message) ? tt("Photo storage isn’t set up yet (see the README: Photo storage).") : error.message);
     return path;
   }
   async getImageUrl(path: string): Promise<string | null> {
@@ -97,7 +98,7 @@ export class SupabaseRepo implements Repo {
 
   async load(): Promise<Workspace> {
     const { data: u, error } = await this.sb.auth.getUser();
-    if (error || !u.user) throw new Error("Not signed in");
+    if (error || !u.user) throw new Error(tt("Not signed in"));
     this.userId = u.user.id;
     const me = this.userId;
 
@@ -169,7 +170,7 @@ export class SupabaseRepo implements Repo {
     const row = { id: s.id, owner_id: this.userId, spec: s.spec, rule: s.rule, section_id: s.sectionId ?? null };
     if (expectedRev === undefined) return toSeries(ok(await this.sb.from("series").insert(row).select().single()) as Row);
     const res = ok(await this.sb.from("series").update(row).eq("id", s.id).eq("rev", expectedRev).select());
-    if (!(res as Row[]).length) throw new ConflictError("This routine was changed elsewhere.");
+    if (!(res as Row[]).length) throw new ConflictError(tt("This routine was changed elsewhere."));
     return toSeries((res as Row[])[0]);
   }
   async deleteSeries(id: ID) {
@@ -216,7 +217,7 @@ export class SupabaseRepo implements Repo {
       ) as Row[];
       if (!res.length) {
         if (opts?.ifAbsent) return null;
-        throw new ConflictError("This routine already has a card on that day.");
+        throw new ConflictError(tt("This routine already has a card on that day."));
       }
       return toInstance(res[0]);
     }
@@ -229,9 +230,9 @@ export class SupabaseRepo implements Repo {
     if (res.length) return toInstance(res[0]);
     // zero rows: stale revision, or RLS said no. Look again to tell which.
     const cur = ok(await this.sb.from("card_instances").select("rev").eq("id", i.id).maybeSingle()) as Row | null;
-    if (!cur) throw new ConflictError("This card no longer exists or you no longer have access.");
+    if (!cur) throw new ConflictError(tt("This card no longer exists or you no longer have access."));
     if (cur.rev !== expectedRev) throw new ConflictError();
-    throw new PermissionError("You don't have permission to edit this card.");
+    throw new PermissionError(tt("You don't have permission to edit this card."));
   }
   async deleteInstance(id: ID) {
     const res = ok(await this.sb.from("card_instances").delete().eq("id", id).select("id")) as Row[];
@@ -265,9 +266,9 @@ export class SupabaseRepo implements Repo {
   }
   async invite(groupId: ID, email: string, role: Exclude<Role, "owner">) {
     const e = email.trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error("Enter a valid email address.");
+    if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error(tt("Enter a valid email address."));
     const { data, error } = await this.sb.from("group_invitations").insert({ group_id: groupId, email: e, role, invited_by: this.userId }).select().single();
-    if (error?.code === "23505") throw new Error("There is already a pending invitation for that email.");
+    if (error?.code === "23505") throw new Error(tt("There is already a pending invitation for that email."));
     if (error) fail(error);
     const r = data as Row;
     return { id: r.id, groupId: r.group_id, email: r.email, role: r.role, status: r.status, invitedBy: r.invited_by, createdAt: r.created_at } as Invitation;

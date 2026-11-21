@@ -1,3 +1,4 @@
+import { localeTag, t } from "../i18n";
 import type { DateStr, TimeStr } from "./types";
 
 /** Date arithmetic on "YYYY-MM-DD" strings via UTC, so DST and the host timezone never shift a calendar day. */
@@ -37,20 +38,31 @@ export const browserTimezone = () => {
 };
 
 const fmt = (d: DateStr, opts: Intl.DateTimeFormatOptions) =>
-  new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...opts }).format(new Date(toUTC(d)));
+  new Intl.DateTimeFormat(localeTag(), { timeZone: "UTC", ...opts }).format(new Date(toUTC(d)));
 
 export const formatShort = (d: DateStr) => fmt(d, { weekday: "short", month: "short", day: "numeric" });
 export const formatLong = (d: DateStr) => fmt(d, { weekday: "long", month: "long", day: "numeric" });
 export const formatMonthYear = (d: DateStr) => fmt(d, { month: "long", year: "numeric" });
-export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-export const WEEKDAY_LABEL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+/** Localized weekday names, indexed 0 = Sunday. Call at render time so they follow the current language. */
+export const weekdayShort = (i: number) => fmt(addDays("2026-11-08", i), { weekday: "short" }); // 2026-11-08 is a Sunday
+export const weekdayLabel = (i: number) => fmt(addDays("2026-11-08", i), { weekday: "long" });
+/** Short numeric-free day, e.g. "Nov 10" / "10 nov". */
+export const formatDayMonth = (d: DateStr) => fmt(d, { month: "short", day: "numeric" });
 
-export function relativeLabel(d: DateStr, today: DateStr): string {
+export type RelativeKind = "today" | "tomorrow" | "yesterday" | "upcoming" | "earlier";
+/** Language-independent bucket for a date; compare this, never the translated label. */
+export function relativeKind(d: DateStr, today: DateStr): RelativeKind {
   const n = diffDays(d, today);
-  if (n === 0) return "Today";
-  if (n === 1) return "Tomorrow";
-  if (n === -1) return "Yesterday";
-  return n > 0 ? "Upcoming" : "Earlier";
+  return n === 0 ? "today" : n === 1 ? "tomorrow" : n === -1 ? "yesterday" : n > 0 ? "upcoming" : "earlier";
+}
+export function relativeLabel(d: DateStr, today: DateStr): string {
+  switch (relativeKind(d, today)) {
+    case "today": return t("Today");
+    case "tomorrow": return t("Tomorrow");
+    case "yesterday": return t("Yesterday");
+    case "upcoming": return t("Upcoming");
+    default: return t("Earlier");
+  }
 }
 
 export const formatTimeRange = (t?: TimeStr, end?: TimeStr) => (t ? (end ? `${t}–${end}` : t) : "");

@@ -33,6 +33,7 @@ import {
 } from "../domain/types";
 import { memoryImageStore, type ImageStore } from "./imageStore";
 import { applyPatch, type ProgressPatch, type Repo } from "./repo";
+import { t as tt } from "../i18n";
 
 /** Minimal storage abstraction so the demo store can run on localStorage in the browser and a Map in tests. */
 export interface KV {
@@ -315,7 +316,7 @@ export class LocalRepo implements Repo {
     if (i.groupId && !canEditRole(roleIn(db.members, i.groupId, me))) throw new PermissionError();
     if (i.seriesId && db.instances.some((x) => x.seriesId === i.seriesId && x.date === i.date)) {
       if (opts?.ifAbsent) return null;
-      throw new ConflictError("This routine already has a card on that day.");
+      throw new ConflictError(tt("This routine already has a card on that day."));
     }
     const created = { ...i, rev: 1 };
     db.instances.push(created);
@@ -326,11 +327,11 @@ export class LocalRepo implements Repo {
     const db = this.read();
     const me = this.me();
     const idx = db.instances.findIndex((x) => x.id === i.id);
-    if (idx < 0) throw new ConflictError("This card no longer exists.");
+    if (idx < 0) throw new ConflictError(tt("This card no longer exists."));
     const cur = db.instances[idx];
     if (!this.visible(db, cur) || !canEditCard(cur, me, db.members)) throw new PermissionError();
-    if (cur.ownerId !== i.ownerId) throw new PermissionError("The owner of a card can't be changed.");
-    if (i.groupId !== cur.groupId && !canShareCard(cur, me, i.groupId, db.members)) throw new PermissionError("Only the card's creator can change sharing.");
+    if (cur.ownerId !== i.ownerId) throw new PermissionError(tt("The owner of a card can't be changed."));
+    if (i.groupId !== cur.groupId && !canShareCard(cur, me, i.groupId, db.members)) throw new PermissionError(tt("Only the card's creator can change sharing."));
     if (cur.rev !== expectedRev) throw new ConflictError();
     const updated = { ...i, rev: cur.rev + 1, updatedAt: new Date().toISOString(), updatedBy: me };
     db.instances[idx] = updated;
@@ -386,7 +387,7 @@ export class LocalRepo implements Repo {
     return g;
   }
   private requireOwner(db: LocalDB, groupId: ID) {
-    if (!canManageGroup(roleIn(db.members, groupId, this.me()))) throw new PermissionError("Only the group owner can do that.");
+    if (!canManageGroup(roleIn(db.members, groupId, this.me()))) throw new PermissionError(tt("Only the group owner can do that."));
   }
   async renameGroup(id: ID, name: string) {
     const db = this.read();
@@ -409,9 +410,9 @@ export class LocalRepo implements Repo {
     const db = this.read();
     this.requireOwner(db, groupId);
     const e = email.trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error("Enter a valid email address.");
+    if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error(tt("Enter a valid email address."));
     if (db.invitations.some((i) => i.groupId === groupId && i.email === e && i.status === "pending"))
-      throw new Error("There is already a pending invitation for that email.");
+      throw new Error(tt("There is already a pending invitation for that email."));
     const inv: Invitation = { id: uid(), groupId, email: e, role, status: "pending", invitedBy: this.me(), createdAt: new Date().toISOString() };
     db.invitations.push(inv);
     this.write(db);
@@ -430,7 +431,7 @@ export class LocalRepo implements Repo {
     const me = db.users.find((u) => u.id === this.me())!;
     const inv = db.invitations.find((i) => i.id === id);
     // Only the intended recipient (matching email) can respond — knowing the id is not enough.
-    if (!inv || inv.status !== "pending" || inv.email.toLowerCase() !== emailOf(me)) throw new PermissionError("This invitation isn't addressed to you, or is no longer valid.");
+    if (!inv || inv.status !== "pending" || inv.email.toLowerCase() !== emailOf(me)) throw new PermissionError(tt("This invitation isn't addressed to you, or is no longer valid."));
     inv.status = accept ? "accepted" : "declined";
     if (accept && !db.members.some((m) => m.groupId === inv.groupId && m.userId === me.id))
       db.members.push({ groupId: inv.groupId, userId: me.id, role: inv.role });
@@ -440,7 +441,7 @@ export class LocalRepo implements Repo {
     const db = this.read();
     this.requireOwner(db, groupId);
     const m = db.members.find((x) => x.groupId === groupId && x.userId === userId);
-    if (!m || m.role === "owner") throw new PermissionError("The owner's role can't be changed.");
+    if (!m || m.role === "owner") throw new PermissionError(tt("The owner's role can't be changed."));
     m.role = role;
     this.write(db);
   }
@@ -449,7 +450,7 @@ export class LocalRepo implements Repo {
     const me = this.me();
     const target = db.members.find((m) => m.groupId === groupId && m.userId === userId);
     if (!target) return;
-    if (target.role === "owner") throw new PermissionError("The owner can't leave — delete the group instead.");
+    if (target.role === "owner") throw new PermissionError(tt("The owner can't leave — delete the group instead."));
     if (userId !== me) this.requireOwner(db, groupId);
     db.members = db.members.filter((m) => m !== target);
     // a departing member takes their shared cards back

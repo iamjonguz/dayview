@@ -2,6 +2,7 @@
 import clsx from "clsx";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import { useId, useRef, useState } from "react";
+import { useT } from "@/lib/i18n";
 import type { Focus } from "@/lib/domain/types";
 import { clamp01, FOCUS_DEFAULT, focusStyle } from "@/lib/ui/images";
 import { Button, Sheet } from "./ui";
@@ -19,7 +20,7 @@ export function PhotoCropDialog({
   busy,
   progress,
   error,
-  confirmLabel = "Use photo",
+  confirmLabel,
   onCancel,
   onConfirm,
 }: {
@@ -34,6 +35,7 @@ export function PhotoCropDialog({
   onCancel: () => void;
   onConfirm: (f: Focus) => void;
 }) {
+  const t = useT();
   const id = useId();
   const [f, setF] = useState<Focus>(initial ?? FOCUS_DEFAULT);
   const drag = useRef<{ x: number; y: number; fx: number; fy: number; w: number; h: number } | null>(null);
@@ -50,11 +52,11 @@ export function PhotoCropDialog({
       open
       onOpenChange={(o) => !o && !busy && onCancel()}
       title={title}
-      description="Drag the photo to choose what stays in view."
+      description={t("Drag the photo to choose what stays in view.")}
       footer={
         <>
-          <Button onClick={onCancel} disabled={busy}>Cancel</Button>
-          <Button variant="primary" onClick={() => onConfirm(f)} disabled={busy}>{busy ? "Saving…" : confirmLabel}</Button>
+          <Button onClick={onCancel} disabled={busy}>{t("Cancel")}</Button>
+          <Button variant="primary" onClick={() => onConfirm(f)} disabled={busy}>{busy ? t("Saving…") : (confirmLabel ?? t("Use photo"))}</Button>
         </>
       }
     >
@@ -62,7 +64,7 @@ export function PhotoCropDialog({
         <div
           role="group"
           tabIndex={0}
-          aria-label="Photo frame. Use the arrow keys to move the photo, plus and minus to zoom."
+          aria-label={t("Photo frame. Use the arrow keys to move the photo, plus and minus to zoom.")}
           className={clsx(frameCls, "aspect-[4/3] w-full cursor-grab touch-none active:cursor-grabbing")}
           onPointerDown={(e) => {
             const r = e.currentTarget.getBoundingClientRect();
@@ -94,23 +96,23 @@ export function PhotoCropDialog({
         </div>
 
         <div className="flex items-center gap-2">
-          <button type="button" aria-label="Zoom out" onClick={() => set({ zoom: f.zoom - 0.2 })} className="grid size-11 shrink-0 place-items-center rounded-xl border border-line hover:bg-surface-2"><Minus size={18} aria-hidden /></button>
-          <label htmlFor={`${id}-z`} className="sr-only">Zoom</label>
+          <button type="button" aria-label={t("Zoom out")} onClick={() => set({ zoom: f.zoom - 0.2 })} className="grid size-11 shrink-0 place-items-center rounded-xl border border-line hover:bg-surface-2"><Minus size={18} aria-hidden /></button>
+          <label htmlFor={`${id}-z`} className="sr-only">{t("Zoom")}</label>
           <input id={`${id}-z`} type="range" min={1} max={3} step={0.05} value={f.zoom} onChange={(e) => set({ zoom: Number(e.target.value) })} className="h-11 min-w-0 flex-1 accent-[var(--color-accent)]" />
-          <button type="button" aria-label="Zoom in" onClick={() => set({ zoom: f.zoom + 0.2 })} className="grid size-11 shrink-0 place-items-center rounded-xl border border-line hover:bg-surface-2"><Plus size={18} aria-hidden /></button>
-          <button type="button" aria-label="Reset framing" onClick={() => setF(FOCUS_DEFAULT)} className="grid size-11 shrink-0 place-items-center rounded-xl border border-line hover:bg-surface-2"><RotateCcw size={16} aria-hidden /></button>
+          <button type="button" aria-label={t("Zoom in")} onClick={() => set({ zoom: f.zoom + 0.2 })} className="grid size-11 shrink-0 place-items-center rounded-xl border border-line hover:bg-surface-2"><Plus size={18} aria-hidden /></button>
+          <button type="button" aria-label={t("Reset framing")} onClick={() => setF(FOCUS_DEFAULT)} className="grid size-11 shrink-0 place-items-center rounded-xl border border-line hover:bg-surface-2"><RotateCcw size={16} aria-hidden /></button>
         </div>
 
         <div>
-          <p className="mb-1.5 text-sm font-medium text-muted">How it will look</p>
+          <p className="mb-1.5 text-sm font-medium text-muted">{t("How it will look")}</p>
           <div className="flex items-end gap-3">
             <div className="text-center">
               <div className={clsx(frameCls, "size-14")}>{img}</div>
-              <p className="mt-1 text-[13px] text-muted">Compact</p>
+              <p className="mt-1 text-[13px] text-muted">{t("Compact")}</p>
             </div>
             <div className="min-w-0 flex-1 text-center">
               <div className={clsx(frameCls, "h-14 w-full")}>{img}</div>
-              <p className="mt-1 text-[13px] text-muted">Cover card</p>
+              <p className="mt-1 text-[13px] text-muted">{t("Cover card")}</p>
             </div>
           </div>
         </div>

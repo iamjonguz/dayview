@@ -3,16 +3,18 @@ import { useMemo } from "react";
 import type { DayCard } from "@/lib/domain/dayview";
 import { cardProgress, emptyState, resolveSummary } from "@/lib/domain/progress";
 import type { CardInstance, CardSpec, ID, Presentation } from "@/lib/domain/types";
+import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app";
 import { CardFront } from "./ActivityCard";
 
 /** Live preview of a card's front while editing. Inert: it can't be clicked, focused or ticked. */
 export function CardPreview({ spec, groupId }: { spec: CardSpec; groupId: ID | null }) {
+  const t = useT();
   const ws = useApp((s) => s.ws)!;
   const card = useMemo<DayCard>(() => {
     const me = ws.me.id;
     const state = emptyState();
-    const instance: CardInstance = { id: "preview", ownerId: me, groupId, seriesId: null, date: "", spec: { ...spec, title: spec.title || "Untitled" }, completionMode: "together", skipped: false, rev: 1, updatedAt: "", updatedBy: me };
+    const instance: CardInstance = { id: "preview", ownerId: me, groupId, seriesId: null, date: "", spec: { ...spec, title: spec.title || t("Untitled") }, completionMode: "together", skipped: false, rev: 1, updatedAt: "", updatedBy: me };
     const density = spec.density === "compact" ? "compact" : ws.prefs.defaultDensity;
     const presentation: Presentation = spec.style === "cover" ? "cover" : density;
     return {
@@ -27,10 +29,10 @@ export function CardPreview({ spec, groupId }: { spec: CardSpec; groupId: ID | n
       canProgress: false,
       others: [],
     };
-  }, [spec, groupId, ws]);
+  }, [spec, groupId, ws, t]);
   return (
-    <section aria-label="Card preview">
-      <h3 className="mb-1.5 text-sm font-medium text-muted">Preview</h3>
+    <section aria-label={t("Card preview")}>
+      <h3 className="mb-1.5 text-sm font-medium text-muted">{t("Preview")}</h3>
       <div inert>
         <CardFront card={card} ws={ws} onFlip={() => {}} flipRef={{ current: null }} />
       </div>

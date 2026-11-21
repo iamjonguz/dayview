@@ -1,4 +1,5 @@
 import { BookOpen, Briefcase, Car, Coffee, Dumbbell, Footprints, GraduationCap, Heart, House, Moon, Music, Phone, Pill, ShoppingBasket, Sparkles, Sunrise, Utensils, type LucideIcon } from "lucide-react";
+import { t } from "../i18n";
 import { ACCENTS, isLegacyAccent } from "../domain/factory";
 import type { CardSpec } from "../domain/types";
 
@@ -34,5 +35,5 @@ export function activityIconKey(spec: Pick<CardSpec, "title" | "icon">): string 
 export function activityStyle(spec: Pick<CardSpec, "title" | "icon" | "accent">) {
   const key = activityIconKey(spec);
   const meta = ACTIVITY_ICONS[key];
-  return { key, Icon: meta.Icon, label: meta.label, color: isLegacyAccent(spec.accent) ? meta.color : spec.accent };
+  return { key, Icon: meta.Icon, label: t(meta.label), color: isLegacyAccent(spec.accent) ? meta.color : spec.accent };
 }

@@ -7,6 +7,7 @@ import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import { useState } from "react";
 import type { DayCard, DayView } from "@/lib/domain/dayview";
 import { formatTimeRange } from "@/lib/domain/dates";
+import { useT } from "@/lib/i18n";
 import type { ID, Section } from "@/lib/domain/types";
 import { IconButton } from "./ui";
 
@@ -18,6 +19,7 @@ const key = (s: ID | null) => `sec:${s ?? "none"}`;
  * or use the always-available Up/Down buttons and the section menu — no drag required.
  */
 export function ArrangeView({ view, sections, onChange }: { view: DayView; sections: Section[]; onChange: (l: Layout) => void }) {
+  const t = useT();
   const fromView = (): Layout => view.sections.map((g) => ({ sectionId: g.section?.id ?? null, ids: g.cards.map((c) => c.instance.id) }));
   const [layout, setLayout] = useState<Layout>(fromView);
   const [live, setLive] = useState("");
@@ -28,7 +30,7 @@ export function ArrangeView({ view, sections, onChange }: { view: DayView; secti
   }
   const cards = new Map<ID, DayCard>(view.sections.flatMap((g) => g.cards).map((c) => [c.instance.id, c]));
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-  const nameOf = (sid: ID | null) => (sid ? (sections.find((s) => s.id === sid)?.name ?? "section") : "Anytime");
+  const nameOf = (sid: ID | null) => (sid ? (sections.find((s) => s.id === sid)?.name ?? t("section")) : t("Anytime"));
 
   const containerOf = (id: string, l: Layout) => (id.startsWith("sec:") ? l.find((g) => key(g.sectionId) === id) : l.find((g) => g.ids.includes(id)));
 
@@ -64,7 +66,7 @@ export function ArrangeView({ view, sections, onChange }: { view: DayView; secti
     }
     setLayout(next);
     const c = containerOf(String(active.id), next);
-    setLive(`${cards.get(String(active.id))?.instance.spec.title} moved to ${nameOf(c?.sectionId ?? null)}, position ${(c?.ids.indexOf(String(active.id)) ?? 0) + 1}`);
+    setLive(t("{title} moved to {section}, position {pos}", { title: cards.get(String(active.id))?.instance.spec.title ?? "", section: nameOf(c?.sectionId ?? null), pos: (c?.ids.indexOf(String(active.id)) ?? 0) + 1 }));
     onChange(next);
   };
   const nudge = (id: ID, d: -1 | 1) => {
@@ -73,13 +75,13 @@ export function ArrangeView({ view, sections, onChange }: { view: DayView; secti
     if (i + d < 0 || i + d >= g.ids.length) return;
     const next = layout.map((x) => (x === g ? { ...x, ids: arrayMove(x.ids, i, i + d) } : x));
     setLayout(next);
-    setLive(`${cards.get(id)?.instance.spec.title} moved ${d < 0 ? "up" : "down"} to position ${i + d + 1} of ${g.ids.length}`);
+    setLive(t(d < 0 ? "{title} moved up to position {pos} of {count}" : "{title} moved down to position {pos} of {count}", { title: cards.get(id)?.instance.spec.title ?? "", pos: i + d + 1, count: g.ids.length }));
     onChange(next);
   };
   const toSection = (id: ID, sid: ID | null) => {
     const next = layout.map((g) => ({ ...g, ids: g.sectionId === sid ? [...g.ids.filter((x) => x !== id), id] : g.ids.filter((x) => x !== id) }));
     setLayout(next);
-    setLive(`${cards.get(id)?.instance.spec.title} moved to ${nameOf(sid)}`);
+    setLive(t("{title} moved to {section}", { title: cards.get(id)?.instance.spec.title ?? "", section: nameOf(sid) }));
     onChange(next);
   };
 
@@ -98,7 +100,7 @@ export function ArrangeView({ view, sections, onChange }: { view: DayView; secti
                   ))}
                 </ul>
               </SortableContext>
-              {g.ids.length === 0 && <p className="rounded-xl border border-dashed border-line p-4 text-center text-[15px] text-muted">Drop a card here, or use a card’s section menu.</p>}
+              {g.ids.length === 0 && <p className="rounded-xl border border-dashed border-line p-4 text-center text-[15px] text-muted">{t("Drop a card here, or use a card’s section menu.")}</p>}
             </Zone>
           );
         })}
@@ -118,27 +120,28 @@ function Zone({ id, title, children }: { id: string; title: string; children: Re
 }
 
 function Row({ card, index, count, sections, current, onNudge, onSection }: { card: DayCard; index: number; count: number; sections: Section[]; current: ID | null; onNudge: (id: ID, d: -1 | 1) => void; onSection: (id: ID, s: ID | null) => void }) {
+  const t = useT();
   const id = card.instance.id;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const spec = card.instance.spec;
   return (
     <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={clsx("min-w-0 rounded-xl border border-line bg-surface p-2", isDragging && "z-10 opacity-90 ring-2 ring-focus")}>
       <div className="flex min-w-0 items-center gap-1">
-        <button type="button" {...attributes} {...listeners} aria-label={`Drag ${spec.title}. Press space to pick up, arrow keys to move.`} className="grid size-11 shrink-0 touch-none place-items-center rounded-lg text-muted hover:bg-surface-2 active:cursor-grabbing">
+        <button type="button" {...attributes} {...listeners} aria-label={t("Drag {title}. Press space to pick up, arrow keys to move.", { title: spec.title })} className="grid size-11 shrink-0 touch-none place-items-center rounded-lg text-muted hover:bg-surface-2 active:cursor-grabbing">
           <GripVertical size={20} />
         </button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[17px] font-semibold leading-snug">{spec.title}</p>
-          <p className="truncate text-[15px] text-muted">{formatTimeRange(spec.time, spec.endTime) || "No time"}</p>
+          <p className="truncate text-[15px] text-muted">{formatTimeRange(spec.time, spec.endTime) || t("No time")}</p>
         </div>
       </div>
       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1 pl-12">
-        <select aria-label={`Section for ${spec.title}`} value={current ?? ""} onChange={(e) => onSection(id, e.target.value || null)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-bg px-2 text-[15px]">
-          <option value="">Anytime</option>
+        <select aria-label={t("Section for {title}", { title: spec.title })} value={current ?? ""} onChange={(e) => onSection(id, e.target.value || null)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-bg px-2 text-[15px]">
+          <option value="">{t("Anytime")}</option>
           {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <IconButton label={`Move ${spec.title} up`} variant="outline" disabled={index === 0} onClick={() => onNudge(id, -1)}><ArrowUp size={18} /></IconButton>
-        <IconButton label={`Move ${spec.title} down`} variant="outline" disabled={index === count - 1} onClick={() => onNudge(id, 1)}><ArrowDown size={18} /></IconButton>
+        <IconButton label={t("Move {title} up", { title: spec.title })} variant="outline" disabled={index === 0} onClick={() => onNudge(id, -1)}><ArrowUp size={18} /></IconButton>
+        <IconButton label={t("Move {title} down", { title: spec.title })} variant="outline" disabled={index === count - 1} onClick={() => onNudge(id, 1)}><ArrowDown size={18} /></IconButton>
       </div>
     </li>
   );

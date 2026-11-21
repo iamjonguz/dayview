@@ -1,3 +1,4 @@
+import { t as tt } from "../i18n";
 /** Where demo-mode photos live. The browser uses IndexedDB (persistent, far larger than localStorage); tests use a Map. */
 export interface ImageStore {
   put(path: string, blob: Blob): Promise<void>;
@@ -14,11 +15,11 @@ const STORE = "images";
 export const indexedDbImageStore = (): ImageStore => {
   const open = () =>
     new Promise<IDBDatabase>((resolve, reject) => {
-      if (typeof indexedDB === "undefined") return reject(new Error("This browser can’t store photos on this device."));
+      if (typeof indexedDB === "undefined") return reject(new Error(tt("This browser can’t store photos on this device.")));
       const r = indexedDB.open(DB, 1);
       r.onupgradeneeded = () => r.result.createObjectStore(STORE);
       r.onsuccess = () => resolve(r.result);
-      r.onerror = () => reject(r.error ?? new Error("Couldn’t open photo storage."));
+      r.onerror = () => reject(r.error ?? new Error(tt("Couldn’t open photo storage.")));
     });
   const run = async <T,>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> => {
     const db = await open();
@@ -26,8 +27,8 @@ export const indexedDbImageStore = (): ImageStore => {
       const tx = db.transaction(STORE, mode);
       const req = fn(tx.objectStore(STORE));
       tx.oncomplete = () => (db.close(), resolve(req.result));
-      tx.onerror = () => (db.close(), reject(tx.error ?? new Error("Couldn’t save the photo.")));
-      tx.onabort = () => (db.close(), reject(tx.error ?? new Error("Couldn’t save the photo (storage may be full).")));
+      tx.onerror = () => (db.close(), reject(tx.error ?? new Error(tt("Couldn’t save the photo."))));
+      tx.onabort = () => (db.close(), reject(tx.error ?? new Error(tt("Couldn’t save the photo (storage may be full)."))));
     });
   };
   return {

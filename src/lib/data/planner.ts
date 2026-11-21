@@ -24,6 +24,7 @@ import {
   type Workspace,
 } from "../domain/types";
 import type { ProgressPatch, Repo } from "./repo";
+import { t as tt } from "../i18n";
 
 export type EditScope = "this" | "future";
 
@@ -155,9 +156,9 @@ export class Planner {
   async createCard(input: CreateInput): Promise<CardInstance | null> {
     const { date, spec } = input;
     const groupId = input.groupId ?? null;
-    if (groupId && !canEditRole(roleIn(this.ws.members, groupId, this.me.id))) throw new PermissionError("You can't share cards with that group.");
+    if (groupId && !canEditRole(roleIn(this.ws.members, groupId, this.me.id))) throw new PermissionError(tt("You can't share cards with that group."));
     if (input.recurrence) {
-      if (groupId) throw new PermissionError("Recurring routines are personal. Share an individual day's card instead.");
+      if (groupId) throw new PermissionError(tt("Recurring routines are personal. Share an individual day's card instead."));
       const series: Series = {
         id: uid(),
         ownerId: this.me.id,
@@ -193,7 +194,7 @@ export class Planner {
   ): Promise<CardInstance> {
     const me = this.me.id;
     const members = this.ws.members;
-    if (!canEditCard(inst, me, members)) throw new PermissionError("You don't have permission to edit this card.");
+    if (!canEditCard(inst, me, members)) throw new PermissionError(tt("You don't have permission to edit this card."));
     const next: CardInstance = {
       ...inst,
       spec: patch.spec,
@@ -201,7 +202,7 @@ export class Planner {
       completionMode: patch.completionMode ?? inst.completionMode,
     };
     if (next.groupId !== inst.groupId && !canShareCard(inst, me, next.groupId, members))
-      throw new PermissionError("Only the person who created a card can change who it's shared with.");
+      throw new PermissionError(tt("Only the person who created a card can change who it's shared with."));
     if (scope === "future" && inst.seriesId && !inst.groupId && !next.groupId) {
       const series = this.ws.series.find((s) => s.id === inst.seriesId);
       if (series) return this.updateSeriesFrom(inst, series, patch.spec, patch.rule);
@@ -356,7 +357,7 @@ export class Planner {
   // ---------------------------------------------------------------- progress & placement
   async patchProgress(inst: CardInstance, patch: ProgressPatch) {
     const scope = scopeFor(inst, this.me.id);
-    if (!canUpdateProgress(inst, this.me.id, scope, this.ws.members)) throw new PermissionError("You can't update progress on this card.");
+    if (!canUpdateProgress(inst, this.me.id, scope, this.ws.members)) throw new PermissionError(tt("You can't update progress on this card."));
     return this.repo.patchProgress(inst.id, scope, patch);
   }
 
@@ -443,7 +444,7 @@ export class Planner {
 
   // ---------------------------------------------------------------- groups
   private requireOwner(groupId: ID) {
-    if (!canManageGroup(roleIn(this.ws.members, groupId, this.me.id))) throw new PermissionError("Only the group owner can do that.");
+    if (!canManageGroup(roleIn(this.ws.members, groupId, this.me.id))) throw new PermissionError(tt("Only the group owner can do that."));
   }
   async createGroup(name: string) {
     const g = await this.repo.createGroup(name.trim());

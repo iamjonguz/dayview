@@ -8,6 +8,7 @@ import { Planner, type CreateInput, type EditScope } from "@/lib/data/planner";
 import { SupabaseRepo } from "@/lib/data/supabase";
 import { seedDemo } from "@/lib/data/seed";
 import type { Repo, ProgressPatch } from "@/lib/data/repo";
+import { t } from "@/lib/i18n";
 import { buildDayView, type DayCard, type DayView } from "@/lib/domain/dayview";
 import { emptyState } from "@/lib/domain/progress";
 import { scopeFor } from "@/lib/domain/permissions";
@@ -151,10 +152,10 @@ export const useApp = create<AppState>((set, get) => {
         const planner = new Planner(repo);
         await planner.init();
         unsub?.();
-        let t: ReturnType<typeof setTimeout> | undefined;
+        let timer: ReturnType<typeof setTimeout> | undefined;
         const soft = () => {
-          clearTimeout(t);
-          t = setTimeout(() => void get().refresh({ silent: true, }), 200);
+          clearTimeout(timer);
+          timer = setTimeout(() => void get().refresh({ silent: true, }), 200);
         };
         const unsubRepo = repo.subscribe(soft);
         const onFocus = () => soft();
@@ -206,7 +207,7 @@ export const useApp = create<AppState>((set, get) => {
         set({ ws: { ...ws }, data, view: planner.view(data), dayLoading: false, dayError: undefined });
       } catch (e) {
         if (req !== dayReq) return;
-        const msg = e instanceof Error ? e.message : "Couldn't load this day.";
+        const msg = e instanceof Error ? e.message : t("Couldn't load this day.");
         set({ dayLoading: false, dayError: msg });
       }
     },
@@ -217,7 +218,7 @@ export const useApp = create<AppState>((set, get) => {
       setTimeout(() => get().dismissToast(id), opts?.kind === "error" ? 9000 : opts?.action ? 8000 : 4000);
     },
     dismissToast(id) {
-      set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+      set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) }));
     },
 
     async act(fn, opts) {
@@ -227,16 +228,16 @@ export const useApp = create<AppState>((set, get) => {
         const value = await fn(planner);
         await get().refresh({ silent: true });
         if (opts?.done || opts?.undo) {
-          get().toast(opts.done ?? "Done", {
+          get().toast(opts.done ?? t("Done"), {
             action: opts.undo
               ? {
-                  label: "Undo",
+                  label: t("Undo"),
                   run: async () => {
                     try {
                       await opts.undo!(value);
                       await get().refresh({ silent: true });
                     } catch (e) {
-                      get().toast(e instanceof Error ? `Couldn't undo: ${e.message}` : "Couldn't undo", { kind: "error" });
+                      get().toast(e instanceof Error ? t("Couldn't undo: {error}", { error: e.message }) : t("Couldn't undo"), { kind: "error" });
                     }
                   },
                 }
@@ -248,10 +249,10 @@ export const useApp = create<AppState>((set, get) => {
         const conflict = error instanceof ConflictError;
         get().toast(
           conflict
-            ? "This was changed somewhere else, so your change wasn't saved. The latest version is shown."
+            ? t("This was changed somewhere else, so your change wasn't saved. The latest version is shown.")
             : error instanceof PermissionError
               ? error.message
-              : `Couldn't save: ${error instanceof Error ? error.message : "unknown error"}`,
+              : t("Couldn't save: {error}", { error: error instanceof Error ? error.message : t("unknown error") }),
           { kind: "error" },
         );
         await get().refresh({ silent: true });
@@ -262,8 +263,8 @@ export const useApp = create<AppState>((set, get) => {
     async createCard(input) {
       const r = await get().act((p) => p.createCard(input));
       if (r.ok) {
-        if (r.value === null) get().toast("Routine saved. It will appear on its next scheduled day.");
-        else get().toast(input.recurrence ? "Routine created" : "Card added");
+        if (r.value === null) get().toast(t("Routine saved. It will appear on its next scheduled day."));
+        else get().toast(input.recurrence ? t("Routine created") : t("Card added"));
       }
       return r.ok;
     },
@@ -278,7 +279,7 @@ export const useApp = create<AppState>((set, get) => {
       } catch (e) {
         await get().refresh({ silent: true });
         if (e instanceof ConflictError) return { ok: false, conflict: true };
-        get().toast(e instanceof Error ? e.message : "Couldn't save", { kind: "error" });
+        get().toast(e instanceof Error ? e.message : t("Couldn't save"), { kind: "error" });
         return { ok: false };
       }
     },
@@ -303,7 +304,7 @@ export const useApp = create<AppState>((set, get) => {
         void get().refresh({ silent: true });
       } catch (e) {
         set({ data: prev, view: rebuild(prev) });
-        get().toast(e instanceof PermissionError ? e.message : "Couldn't save your progress. Your change was undone.", { kind: "error" });
+        get().toast(e instanceof PermissionError ? e.message : t("Couldn't save your progress. Your change was undone."), { kind: "error" });
       }
     },
 
@@ -322,7 +323,7 @@ export const useApp = create<AppState>((set, get) => {
         void get().refresh({ silent: true });
       } catch {
         set({ data: prev, view: rebuild(prev) });
-        get().toast("Couldn't save the new order. It was put back.", { kind: "error" });
+        get().toast(t("Couldn't save the new order. It was put back."), { kind: "error" });
       }
     },
 
@@ -339,7 +340,7 @@ export const useApp = create<AppState>((set, get) => {
       } catch {
         planner.ws = { ...planner.ws, prefs: prev };
         set({ ws: { ...ws, prefs: prev }, view: data ? planner.view(data) : get().view });
-        get().toast("Couldn’t save your view preference.", { kind: "error" });
+        get().toast(t("Couldn’t save your view preference."), { kind: "error" });
       }
     },
 

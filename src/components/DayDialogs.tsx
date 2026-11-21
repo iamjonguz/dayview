@@ -1,7 +1,8 @@
 "use client";
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { addDays, formatLong, formatMonthYear, monthGrid, WEEKDAY_SHORT } from "@/lib/domain/dates";
+import { addDays, formatLong, formatMonthYear, monthGrid, weekdayShort } from "@/lib/domain/dates";
+import { useT } from "@/lib/i18n";
 import { uid } from "@/lib/domain/factory";
 import type { DateStr, DayLayout, Section } from "@/lib/domain/types";
 import { useApp } from "@/store/app";
@@ -9,6 +10,7 @@ import clsx from "clsx";
 import { Button, Confirm, Field, IconButton, Sheet, inputCls } from "./ui";
 
 export function DatePickerSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const t = useT();
   const date = useApp((s) => s.date);
   const setDate = useApp((s) => s.setDate);
   const planner = useApp((s) => s.planner);
@@ -17,15 +19,15 @@ export function DatePickerSheet({ open, onOpenChange }: { open: boolean; onOpenC
   const days = monthGrid(month);
   const shiftMonth = (n: number) => setMonth(addDays(`${month.slice(0, 7)}-15`, n * 30));
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="Pick a day" description="Browse earlier days or plan ahead.">
+    <Sheet open={open} onOpenChange={onOpenChange} title={t("Pick a day")} description={t("Browse earlier days or plan ahead.")}>
       <div className="mx-auto max-w-sm">
         <div className="mb-2 flex items-center justify-between">
-          <IconButton label="Previous month" variant="ghost" onClick={() => shiftMonth(-1)}><ChevronLeft size={20} /></IconButton>
+          <IconButton label={t("Previous month")} variant="ghost" onClick={() => shiftMonth(-1)}><ChevronLeft size={20} /></IconButton>
           <p className="font-semibold text-xl" aria-live="polite">{formatMonthYear(month)}</p>
-          <IconButton label="Next month" variant="ghost" onClick={() => shiftMonth(1)}><ChevronRight size={20} /></IconButton>
+          <IconButton label={t("Next month")} variant="ghost" onClick={() => shiftMonth(1)}><ChevronRight size={20} /></IconButton>
         </div>
         <div role="grid" aria-label={formatMonthYear(month)} className="grid grid-cols-7 gap-1 text-center">
-          {[1, 2, 3, 4, 5, 6, 0].map((d) => <div key={d} role="columnheader" className="py-1 text-xs text-muted">{WEEKDAY_SHORT[d]}</div>)}
+          {[1, 2, 3, 4, 5, 6, 0].map((d) => <div key={d} role="columnheader" className="py-1 text-xs text-muted">{weekdayShort(d)}</div>)}
           {days.map((d) => {
             const inMonth = d.slice(0, 7) === month.slice(0, 7);
             const sel = d === date;
@@ -44,13 +46,14 @@ export function DatePickerSheet({ open, onOpenChange }: { open: boolean; onOpenC
             );
           })}
         </div>
-        <Button className="mt-4 w-full" onClick={() => { void setDate(today); onOpenChange(false); }}>Go to today</Button>
+        <Button className="mt-4 w-full" onClick={() => { void setDate(today); onOpenChange(false); }}>{t("Go to today")}</Button>
       </div>
     </Sheet>
   );
 }
 
 export function SectionsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const t = useT();
   const ws = useApp((s) => s.ws)!;
   const act = useApp((s) => s.act);
   const [rows, setRows] = useState<Section[]>(ws.sections);
@@ -68,12 +71,12 @@ export function SectionsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
       <Sheet
         open={open}
         onOpenChange={onOpenChange}
-        title="Sections"
-        description="Group your day however you like. The start time only decides where new timed cards land."
+        title={t("Sections")}
+        description={t("Group your day however you like. The start time only decides where new timed cards land.")}
         footer={
           <>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button variant="primary" disabled={rows.some((r) => !r.name.trim())} onClick={async () => { const r = await act((p) => p.saveSections(rows.map((x) => ({ ...x, name: x.name.trim() }))), { done: "Sections saved" }); if (r.ok) onOpenChange(false); }}>Save</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t("Cancel")}</Button>
+            <Button variant="primary" disabled={rows.some((r) => !r.name.trim())} onClick={async () => { const r = await act((p) => p.saveSections(rows.map((x) => ({ ...x, name: x.name.trim() }))), { done: t("Sections saved") }); if (r.ok) onOpenChange(false); }}>{t("Save")}</Button>
           </>
         }
       >
@@ -81,31 +84,31 @@ export function SectionsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
           {rows.map((r, i) => (
             <li key={r.id} className="rounded-2xl border border-line bg-bg/60 p-3">
               <div className="flex items-center gap-1">
-                <input aria-label={`Section ${i + 1} name`} className={inputCls} value={r.name} onChange={(e) => upd(r.id, { name: e.target.value })} />
-                <IconButton label="Move up" variant="ghost"  disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={16} /></IconButton>
-                <IconButton label="Move down" variant="ghost"  disabled={i === rows.length - 1} onClick={() => move(i, 1)}><ArrowDown size={16} /></IconButton>
-                <IconButton label={`Delete section ${r.name}`} variant="ghost" className="text-danger" onClick={() => setRemoving(r)}><Trash2 size={16} /></IconButton>
+                <input aria-label={t("Section {n} name", { n: i + 1 })} className={inputCls} value={r.name} onChange={(e) => upd(r.id, { name: e.target.value })} />
+                <IconButton label={t("Move up")} variant="ghost"  disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={16} /></IconButton>
+                <IconButton label={t("Move down")} variant="ghost"  disabled={i === rows.length - 1} onClick={() => move(i, 1)}><ArrowDown size={16} /></IconButton>
+                <IconButton label={t("Delete section {name}", { name: r.name })} variant="ghost" className="text-danger" onClick={() => setRemoving(r)}><Trash2 size={16} /></IconButton>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <label className="text-sm text-muted">Icon
+                <label className="text-sm text-muted">{t("Icon")}
                   <select className={clsx(inputCls, "mt-1")} value={r.icon} onChange={(e) => upd(r.id, { icon: e.target.value as Section["icon"] })}>
-                    {["sunrise", "sun", "moon", "star", "none"].map((x) => <option key={x}>{x}</option>)}
+                    {["sunrise", "sun", "moon", "star", "none"].map((x) => <option key={x} value={x}>{t(x)}</option>)}
                   </select>
                 </label>
-                <label className="text-sm text-muted">Starts around
+                <label className="text-sm text-muted">{t("Starts around")}
                   <input type="time" className={clsx(inputCls, "mt-1")} value={r.from ?? ""} onChange={(e) => upd(r.id, { from: e.target.value || undefined })} />
                 </label>
               </div>
             </li>
           ))}
         </ul>
-        <Button className="mt-3" onClick={() => setRows([...rows, { id: uid(), name: "New section", icon: "none", position: rows.length }])}><Plus size={16} aria-hidden /> Add section</Button>
+        <Button className="mt-3" onClick={() => setRows([...rows, { id: uid(), name: t("New section"), icon: "none", position: rows.length }])}><Plus size={16} aria-hidden /> {t("Add section")}</Button>
       </Sheet>
       <Confirm
         open={!!removing}
         onOpenChange={(o) => !o && setRemoving(null)}
-        title={`Delete “${removing?.name}”?`}
-        description="Cards in this section aren’t deleted — they move to “Anytime”. Press Save to apply."
+        title={t("Delete “{name}”?", { name: removing?.name ?? "" })}
+        description={t("Cards in this section aren’t deleted — they move to “Anytime”. Press Save to apply.")}
         onConfirm={() => setRows(rows.filter((r) => r.id !== removing!.id))}
       />
     </>
@@ -113,6 +116,7 @@ export function SectionsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
 }
 
 export function SaveLayoutSheet({ open, onOpenChange, date }: { open: boolean; onOpenChange: (o: boolean) => void; date: DateStr }) {
+  const t = useT();
   const act = useApp((s) => s.act);
   const [name, setName] = useState("");
   const [auto, setAuto] = useState<number[]>([]);
@@ -120,17 +124,17 @@ export function SaveLayoutSheet({ open, onOpenChange, date }: { open: boolean; o
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
-      title="Save this day as a layout"
-      description={`Captures the cards you own on ${formatLong(date)}, with their sections and order. Progress isn’t copied.`}
+      title={t("Save this day as a layout")}
+      description={t("Captures the cards you own on {date}, with their sections and order. Progress isn’t copied.", { date: formatLong(date) })}
       footer={
         <>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="primary" disabled={!name.trim()} onClick={async () => { const r = await act((p) => p.saveDayAsLayout(date, name, auto), { done: "Layout saved" }); if (r.ok) onOpenChange(false); }}>Save layout</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("Cancel")}</Button>
+          <Button variant="primary" disabled={!name.trim()} onClick={async () => { const r = await act((p) => p.saveDayAsLayout(date, name, auto), { done: t("Layout saved") }); if (r.ok) onOpenChange(false); }}>{t("Save layout")}</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Field label="Name" htmlFor="ln"><input id="ln" className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Weekday setup" /></Field>
+        <Field label={t("Name")} htmlFor="ln"><input id="ln" className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("e.g. Weekday setup")} /></Field>
         <AutoApplyPicker value={auto} onChange={setAuto} />
       </div>
     </Sheet>
@@ -138,41 +142,43 @@ export function SaveLayoutSheet({ open, onOpenChange, date }: { open: boolean; o
 }
 
 export function AutoApplyPicker({ value, onChange }: { value: number[]; onChange: (v: number[]) => void }) {
+  const t = useT();
   return (
     <div>
-      <p className="mb-1.5 text-sm font-medium text-muted">Apply automatically on (optional)</p>
-      <div role="group" aria-label="Weekdays to apply the layout to" className="flex flex-wrap gap-1.5">
+      <p className="mb-1.5 text-sm font-medium text-muted">{t("Apply automatically on (optional)")}</p>
+      <div role="group" aria-label={t("Weekdays to apply the layout to")} className="flex flex-wrap gap-1.5">
         {[1, 2, 3, 4, 5, 6, 0].map((d) => {
           const on = value.includes(d);
           return (
             <button key={d} type="button" aria-pressed={on} onClick={() => onChange(on ? value.filter((x) => x !== d) : [...value, d])} className={clsx("min-h-11 min-w-12 rounded-xl border px-2 text-sm", on ? "border-accent bg-accent font-semibold text-accent-ink" : "border-line hover:bg-surface-2")}>
-              {WEEKDAY_SHORT[d]}
+              {weekdayShort(d)}
             </button>
           );
         })}
       </div>
-      <p className="mt-1 text-xs text-muted">Auto-applied layouts add their cards once to today and future days only — never to past days — and never twice.</p>
+      <p className="mt-1 text-xs text-muted">{t("Auto-applied layouts add their cards once to today and future days only — never to past days — and never twice.")}</p>
     </div>
   );
 }
 
 export function ApplyLayoutSheet({ open, onOpenChange, date }: { open: boolean; onOpenChange: (o: boolean) => void; date: DateStr }) {
+  const t = useT();
   const ws = useApp((s) => s.ws)!;
   const act = useApp((s) => s.act);
   const toast = useApp((s) => s.toast);
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="Apply a day layout" description={`Adds the layout’s cards to ${formatLong(date)}. Each layout can be applied once per day.`}>
+    <Sheet open={open} onOpenChange={onOpenChange} title={t("Apply a day layout")} description={t("Adds the layout’s cards to {date}. Each layout can be applied once per day.", { date: formatLong(date) })}>
       {ws.layouts.length === 0 ? (
-        <p className="text-muted">No saved layouts yet. Arrange a day, then use “Save this day as layout”.</p>
+        <p className="text-muted">{t("No saved layouts yet. Arrange a day, then use “Save this day as layout”.")}</p>
       ) : (
         <ul className="space-y-2">
           {ws.layouts.map((l: DayLayout) => (
             <li key={l.id} className="flex items-center justify-between gap-3 rounded-2xl border border-line p-3">
               <div>
                 <p className="font-medium">{l.name}</p>
-                <p className="text-sm text-muted">{l.entries.length} cards{l.autoApply.length ? ` · auto on ${l.autoApply.map((d) => WEEKDAY_SHORT[d]).join(", ")}` : ""}</p>
+                <p className="text-sm text-muted">{l.entries.length === 1 ? t("{n} card", { n: 1 }) : t("{n} cards", { n: l.entries.length })}{l.autoApply.length ? ` · ${t("auto on {days}", { days: l.autoApply.map((d) => weekdayShort(d)).join(", ") })}` : ""}</p>
               </div>
-              <Button variant="primary" small onClick={async () => { const r = await act((p) => p.applyLayout(l, date)); if (r.ok) { toast(r.value ? `Added ${l.entries.length} cards` : "That layout was already applied to this day."); onOpenChange(false); } }}>Apply</Button>
+              <Button variant="primary" small onClick={async () => { const r = await act((p) => p.applyLayout(l, date)); if (r.ok) { toast(r.value ? (l.entries.length === 1 ? t("Added {n} card", { n: 1 }) : t("Added {n} cards", { n: l.entries.length })) : t("That layout was already applied to this day.")); onOpenChange(false); } }}>{t("Apply")}</Button>
             </li>
           ))}
         </ul>

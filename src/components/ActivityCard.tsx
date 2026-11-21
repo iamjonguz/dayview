@@ -27,6 +27,7 @@ import {
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { DayCard } from "@/lib/domain/dayview";
 import { formatTimeRange } from "@/lib/domain/dates";
+import { t, useT } from "@/lib/i18n";
 import { frontText, peopleLine } from "@/lib/domain/front";
 import { newBlock, uid } from "@/lib/domain/factory";
 import { fmtNum, isTracking, blockFraction, blockComplete, relevantBlocks } from "@/lib/domain/progress";
@@ -141,8 +142,9 @@ export function ActivityCard(props: Props) {
 /* ------------------------------------------------------------------ completion control */
 /** Manual completion: a square checkbox. Always means "you decide". */
 function Checkbox({ checked, disabled, onToggle, label }: { checked: boolean; disabled?: boolean; onToggle: () => void; label: string }) {
+  const t = useT();
   return (
-    <button type="button" role="checkbox" aria-checked={checked} aria-disabled={disabled || undefined} aria-label={label} title={disabled ? "Only editors can change this shared card’s completion" : undefined} onClick={() => !disabled && onToggle()} className={clsx("relative z-10 grid size-11 shrink-0 place-items-center rounded-full", disabled ? "cursor-not-allowed opacity-60" : "hover:bg-white/5")}>
+    <button type="button" role="checkbox" aria-checked={checked} aria-disabled={disabled || undefined} aria-label={label} title={disabled ? t("Only editors can change this shared card’s completion") : undefined} onClick={() => !disabled && onToggle()} className={clsx("relative z-10 grid size-11 shrink-0 place-items-center rounded-full", disabled ? "cursor-not-allowed opacity-60" : "hover:bg-white/5")}>
       <span className={clsx("grid size-6 place-items-center rounded-md border-2", checked ? "border-done bg-done" : "border-muted")}>
         {checked && <Check size={16} strokeWidth={3.5} className="text-done-ink" aria-hidden />}
       </span>
@@ -168,6 +170,7 @@ function Ring({ fraction, complete, size = 28, accent }: { fraction: number; com
 
 /** Completion is its own control — never part of the "open details" target. */
 function CompletionControl({ card, title, onOpenTracking }: { card: DayCard; title: string; onOpenTracking: () => void }) {
+  const t = useT();
   const patch = useApp((s) => s.patchProgress);
   const derived = card.instance.spec.completion.mode === "derived";
   const { complete, fraction, label } = card.progress;
@@ -176,14 +179,14 @@ function CompletionControl({ card, title, onOpenTracking }: { card: DayCard; tit
       <button
         type="button"
         onClick={onOpenTracking}
-        aria-label={`${title}: ${complete ? "complete" : label || "not complete"}. Completes automatically. Open tracking`}
-        title={`Completes automatically from ${label || "its tracking"} — select to open tracking`}
+        aria-label={t("{title}: {status}. Completes automatically. Open tracking", { title, status: complete ? t("complete") : label || t("not complete") })}
+        title={t("Completes automatically from {source} — select to open tracking", { source: label || t("its tracking") })}
         className="relative z-10 grid size-11 shrink-0 place-items-center rounded-full hover:bg-white/5"
       >
         <Ring fraction={fraction} complete={complete} accent={PROGRESS_FILL} />
       </button>
     );
-  return <Checkbox checked={complete} disabled={!card.canProgress} label={`Mark ${title} as done`} onToggle={() => void patch(card, { completed: !complete })} />;
+  return <Checkbox checked={complete} disabled={!card.canProgress} label={t("Mark {title} as done", { title })} onToggle={() => void patch(card, { completed: !complete })} />;
 }
 
 /* ------------------------------------------------------------------ front */
@@ -191,8 +194,8 @@ function CompletionControl({ card, title, onOpenTracking }: { card: DayCard; tit
 function progressNote(card: DayCard): string | null {
   const manual = card.instance.spec.completion.mode === "manual";
   if (!manual || !card.progress.hasTracking) return null;
-  if (card.progress.fraction >= 1 && !card.progress.complete) return "Ready to mark done";
-  if (card.progress.complete && card.progress.fraction < 1) return "Marked done";
+  if (card.progress.fraction >= 1 && !card.progress.complete) return t("Ready to mark done");
+  if (card.progress.complete && card.progress.fraction < 1) return t("Marked done");
   return null;
 }
 
@@ -214,6 +217,7 @@ function MetaLine({ pieces, className }: { pieces: { key: string; node: React.Re
 
 /** The front of a card. Also used (inert) by the editor's live preview. */
 export function CardFront({ card, ws, onFlip, flipRef }: FrontProps) {
+  const t = useT();
   const { spec } = card.instance;
   const mode = card.presentation;
   const compact = mode === "compact";
@@ -228,17 +232,17 @@ export function CardFront({ card, ws, onFlip, flipRef }: FrontProps) {
   const note = showProg ? progressNote(card) : null;
   const text = spec.front.showSummary ? frontText(spec, card.summary, [time, fp.label]) : { context: "", summary: "" };
   // the progress label is dropped when the summary already says the same thing (e.g. "12 of 20 pages")
-  const progText = showProg && card.summary !== fp.label ? (note === "Ready to mark done" && compact ? note : fp.label) : "";
+  const progText = showProg && card.summary !== fp.label ? (note === t("Ready to mark done") && compact ? note : fp.label) : "";
   const people = peopleLine(spec, card.instance.groupId, ws);
   const peopleNode = people && (
     <>
       <Users size={12} aria-hidden className="shrink-0" />
-      <span className="sr-only">Shared with </span>
+      <span className="sr-only">{t("Shared with")} </span>
       {people.person && <span aria-hidden className="grid size-[18px] shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-semibold text-fg">{people.person.initials}</span>}
       <span className="min-w-0 truncate">{people.text}</span>
     </>
   );
-  const status = done ? "Done" : derived ? "auto" : "";
+  const status = done ? t("Done") : derived ? t("auto") : "";
   const pieces = [
     time && { key: "t", node: time },
     people && { key: "p", node: peopleNode, grow: true },
@@ -277,8 +281,8 @@ export function CardFront({ card, ws, onFlip, flipRef }: FrontProps) {
               onClick={() => onFlip()}
               className={clsx("block w-full truncate rounded-md text-left font-semibold leading-snug after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-2xl focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-focus", compact || cover ? "text-[17px]" : "text-lg", done ? "text-muted" : "text-fg")}
             >
-              {spec.title || "Untitled"}
-              <span className="sr-only">{done ? ", complete" : ""}. Open details</span>
+              {spec.title || t("Untitled")}
+              <span className="sr-only">{done ? `, ${t("complete")}` : ""}. {t("Open details")}</span>
             </button>
           </h3>
           {(text.context || text.summary) &&
@@ -299,7 +303,7 @@ export function CardFront({ card, ws, onFlip, flipRef }: FrontProps) {
               {pieces.length > 0 && <MetaLine pieces={pieces} className="mt-1 text-[15px]" />}
               {showProg && (
                 <div className="mt-2.5 flex items-center gap-3">
-                  <ProgressBar fraction={fp.fraction} label={`${spec.title} progress`} accent={PROGRESS_FILL} className="min-w-24 max-w-[220px] flex-1" />
+                  <ProgressBar fraction={fp.fraction} label={t("{title} progress", { title: spec.title })} accent={PROGRESS_FILL} className="min-w-24 max-w-[220px] flex-1" />
                 </div>
               )}
             </>
@@ -327,6 +331,7 @@ const Label = ({ children }: { children: React.ReactNode }) => <h4 className="mb
 const normText = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
 
 function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, onMove, onReschedule, onFlip, flipRef }: Props & { onFlip: (o?: FlipOpts) => void; flipRef: React.RefObject<HTMLButtonElement | null> }) {
+  const t = useT();
   const { instance: inst } = card;
   const { spec } = inst;
   const act = useApp((s) => s.act);
@@ -336,10 +341,10 @@ function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, on
   const time = formatTimeRange(spec.time, spec.endTime);
   const group = ws.groups.find((g) => g.id === inst.groupId);
   const derived = spec.completion.mode === "derived";
-  const nameOf = (id: ID | null) => ws.profiles.find((p) => p.id === id)?.name ?? "Unassigned";
+  const nameOf = (id: ID | null) => ws.profiles.find((p) => p.id === id)?.name ?? t("Unassigned");
   const rule = ws.series.find((s) => s.id === inst.seriesId);
   const counted = relevantBlocks(spec);
-  const countedNames = counted.map((b) => b.title || (b.type === "checklist" ? "Checklist" : "Target"));
+  const countedNames = counted.map((b) => b.title || (b.type === "checklist" ? t("Checklist") : t("Target")));
   const firstTracking = spec.blocks.find(isTracking)?.id;
 
   // never say the same thing twice: the written summary is dropped when a note already carries it
@@ -351,7 +356,7 @@ function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, on
   const editSpec = (fn: (blocks: typeof spec.blocks) => typeof spec.blocks) => saveCard(inst, { spec: { ...spec, blocks: fn(spec.blocks) } }, "this");
 
   return (
-    <article aria-label={`${spec.title} details`} className="relative overflow-hidden rounded-2xl border border-line bg-surface p-4">
+    <article aria-label={t("{title} details", { title: spec.title })} className="relative overflow-hidden rounded-2xl border border-line bg-surface p-4">
       {/* the photo carries over to the back as a full-bleed header, so flipping keeps the card recognisable */}
       {hasImage(spec.cover) && (
         <div className="relative -mx-4 -mt-4 mb-3">
@@ -362,14 +367,14 @@ function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, on
       <header className="flex items-start gap-3">
         {!hasImage(spec.cover) && <ActivityVisual spec={spec} size={44} />}
         <div className="min-w-0 flex-1">
-          <h3 className="text-xl font-semibold leading-snug">{spec.title || "Untitled"}</h3>
+          <h3 className="text-xl font-semibold leading-snug">{spec.title || t("Untitled")}</h3>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-muted">
             {time && <span className="inline-flex items-center gap-1.5"><Clock size={14} aria-hidden /> {time}</span>}
-            {group && <span className="inline-flex items-center gap-1.5"><Users size={14} aria-hidden /> {group.name} · {inst.completionMode === "together" ? "complete together" : "each person completes"}</span>}
-            {rule && <span className="inline-flex items-center gap-1.5"><Repeat2 size={14} aria-hidden /> Routine</span>}
+            {group && <span className="inline-flex items-center gap-1.5"><Users size={14} aria-hidden /> {group.name} · {inst.completionMode === "together" ? t("complete together") : t("each person completes")}</span>}
+            {rule && <span className="inline-flex items-center gap-1.5"><Repeat2 size={14} aria-hidden /> {t("Routine")}</span>}
           </p>
         </div>
-        <IconButton ref={flipRef} label={`Close details for ${spec.title || "card"}`} aria-expanded={true} variant="outline" className="-mr-1 -mt-1" onClick={() => onFlip()}>
+        <IconButton ref={flipRef} label={t("Close details for {title}", { title: spec.title || t("card") })} aria-expanded={true} variant="outline" className="-mr-1 -mt-1" onClick={() => onFlip()}>
           <ChevronUp size={20} />
         </IconButton>
       </header>
@@ -379,20 +384,20 @@ function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, on
           <div className="flex items-center gap-3">
             <Ring fraction={card.progress.fraction} complete={card.progress.complete} accent={PROGRESS_FILL} />
             <p className="min-w-0 flex-1 text-[15px]">
-              <span className="font-medium">{card.progress.complete ? "Complete" : "In progress"}</span>
+              <span className="font-medium">{card.progress.complete ? t("Complete") : t("In progress")}</span>
               {card.progress.label && <span className="text-muted"> · {card.progress.label}</span>}
-              <span className="block text-sm text-muted">Completes automatically</span>
+              <span className="block text-sm text-muted">{t("Completes automatically")}</span>
             </p>
-            <button type="button" aria-label="How automatic completion works" aria-expanded={help} onClick={() => setHelp(!help)} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:text-fg"><CircleHelp size={18} aria-hidden /></button>
+            <button type="button" aria-label={t("How automatic completion works")} aria-expanded={help} onClick={() => setHelp(!help)} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:text-fg"><CircleHelp size={18} aria-hidden /></button>
           </div>
-          {help && <p role="note" className="mt-1 pb-1 text-[15px] leading-snug text-muted">{counted.length ? `Done when ${countedNames.join(" and ")} ${counted.length === 1 ? "is" : "are"} complete. Update the tracking below — the card can’t be ticked by hand. Bars stop at 100%.` : "Add a checklist or target in Edit — until then this card can’t complete."}</p>}
+          {help && <p role="note" className="mt-1 pb-1 text-[15px] leading-snug text-muted">{counted.length ? t(counted.length === 1 ? "Done when {names} is complete. Update the tracking below — the card can’t be ticked by hand. Bars stop at 100%." : "Done when {names} are complete. Update the tracking below — the card can’t be ticked by hand. Bars stop at 100%.", { names: countedNames.join(t(" and ")) }) : t("Add a checklist or target in Edit — until then this card can’t complete.")}</p>}
         </div>
       )}
 
       {showSummary && <p className="mt-3 text-[15px] leading-snug text-fg/90">{spec.summary}</p>}
 
       <div className="mt-4 space-y-5">
-        {spec.blocks.length === 0 && <p className="text-[15px] text-muted">Nothing here yet. Use Edit to add notes, a checklist or a target.</p>}
+        {spec.blocks.length === 0 && <p className="text-[15px] text-muted">{t("Nothing here yet. Use Edit to add notes, a checklist or a target.")}</p>}
         {spec.blocks.map((b) => {
           if (b.type === "note")
             return <NoteView key={b.id} lead={b.id === firstNote} title={b.title} text={b.text} canEdit={card.canEdit} onSave={(text) => saveCard(inst, { spec: { ...spec, blocks: spec.blocks.map((x) => (x.id === b.id && x.type === "note" ? { ...x, text } : x)) } }, "this")} />;
@@ -407,15 +412,15 @@ function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, on
 
       {card.others.length > 0 && (
         <section className="mt-5">
-          <Label>Everyone’s progress</Label>
+          <Label>{t("Everyone’s progress")}</Label>
           <ul className="flex flex-wrap gap-2 text-sm">
             {card.others.map((o) => (
-              <li key={o.userId} className="rounded-full border border-line px-3 py-1">{nameOf(o.userId)}: {o.complete ? "done" : "not yet"}</li>
+              <li key={o.userId} className="rounded-full border border-line px-3 py-1">{nameOf(o.userId)}: {o.complete ? t("done") : t("not yet")}</li>
             ))}
           </ul>
         </section>
       )}
-      {!card.canProgress && group && <p className="mt-4 text-sm text-muted">Only editors can update this shared card’s completion.</p>}
+      {!card.canProgress && group && <p className="mt-4 text-sm text-muted">{t("Only editors can update this shared card’s completion.")}</p>}
 
       <footer className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
         {!derived && card.canProgress && (
@@ -425,59 +430,59 @@ function Back({ card, ws, sections, canMoveUp, canMoveDown, onEdit, onDelete, on
             onClick={() => void patch(card, { completed: !card.progress.complete })}
             className={clsx("inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-[15px] font-semibold", card.progress.complete ? "border border-done/60 text-done hover:bg-done/10" : "bg-accent text-accent-ink hover:brightness-105")}
           >
-            <Check size={16} aria-hidden /> {card.progress.complete ? "Done · undo" : "Mark done"}
+            <Check size={16} aria-hidden /> {card.progress.complete ? t("Done · undo") : t("Mark done")}
           </button>
         )}
         {!derived && card.progress.hasTracking && (
-          <button type="button" aria-label="How completion works" aria-expanded={help} onClick={() => setHelp(!help)} className="grid size-11 place-items-center rounded-full text-muted hover:text-fg"><CircleHelp size={18} aria-hidden /></button>
+          <button type="button" aria-label={t("How completion works")} aria-expanded={help} onClick={() => setHelp(!help)} className="grid size-11 place-items-center rounded-full text-muted hover:text-fg"><CircleHelp size={18} aria-hidden /></button>
         )}
         {card.canEdit && (
           <button type="button" onClick={() => onEdit(card)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line px-4 text-[15px] font-medium hover:bg-surface-2">
-            <Pencil size={16} aria-hidden /> Edit
+            <Pencil size={16} aria-hidden /> {t("Edit")}
           </button>
         )}
         <div className="ml-auto">
           <Menu.Root>
             <Menu.Trigger asChild>
-              <IconButton label={`More actions for ${spec.title}`} variant="outline"><MoreHorizontal size={20} /></IconButton>
+              <IconButton label={t("More actions for {title}", { title: spec.title })} variant="outline"><MoreHorizontal size={20} /></IconButton>
             </Menu.Trigger>
             <Menu.Portal>
               <Menu.Content align="end" sideOffset={6} className="z-50 min-w-60 rounded-2xl border border-line bg-surface-2 p-1.5 text-[15px] shadow-lg">
-                {card.canEdit && <Item icon={<Pencil size={16} />} onSelect={() => onEdit(card)}>Edit…</Item>}
-                <Item icon={<Copy size={16} />} onSelect={() => void act((p) => p.duplicateCard(inst), { done: "Card duplicated" })}>Duplicate</Item>
+                {card.canEdit && <Item icon={<Pencil size={16} />} onSelect={() => onEdit(card)}>{t("Edit…")}</Item>}
+                <Item icon={<Copy size={16} />} onSelect={() => void act((p) => p.duplicateCard(inst), { done: t("Card duplicated") })}>{t("Duplicate")}</Item>
                 {card.canEdit && (
-                  <Item icon={<FastForward size={16} />} onSelect={() => void act((p) => p.setSkipped(inst.id, inst.date, true), { done: `Skipped “${spec.title}” for this day`, undo: () => useApp.getState().planner!.setSkipped(inst.id, inst.date, false) })}>Skip this day</Item>
+                  <Item icon={<FastForward size={16} />} onSelect={() => void act((p) => p.setSkipped(inst.id, inst.date, true), { done: t("Skipped “{title}” for this day", { title: spec.title }), undo: () => useApp.getState().planner!.setSkipped(inst.id, inst.date, false) })}>{t("Skip this day")}</Item>
                 )}
-                {card.canEdit && <Item icon={<CalendarClock size={16} />} onSelect={() => onReschedule(card, "move")}>Move to another day…</Item>}
-                <Item icon={<CalendarPlus size={16} />} onSelect={() => onReschedule(card, "copy")}>Copy to another day…</Item>
+                {card.canEdit && <Item icon={<CalendarClock size={16} />} onSelect={() => onReschedule(card, "move")}>{t("Move to another day…")}</Item>}
+                <Item icon={<CalendarPlus size={16} />} onSelect={() => onReschedule(card, "copy")}>{t("Copy to another day…")}</Item>
                 <Menu.Separator className="my-1 h-px bg-line" />
-                <Item icon={<ArrowUp size={16} />} disabled={!canMoveUp} onSelect={() => onMove(card, { dir: -1 })}>Move up</Item>
-                <Item icon={<ArrowDown size={16} />} disabled={!canMoveDown} onSelect={() => onMove(card, { dir: 1 })}>Move down</Item>
+                <Item icon={<ArrowUp size={16} />} disabled={!canMoveUp} onSelect={() => onMove(card, { dir: -1 })}>{t("Move up")}</Item>
+                <Item icon={<ArrowDown size={16} />} disabled={!canMoveDown} onSelect={() => onMove(card, { dir: 1 })}>{t("Move down")}</Item>
                 <Menu.Sub>
-                  <Menu.SubTrigger className="flex min-h-11 cursor-default items-center gap-2 rounded-xl px-3 outline-none data-[highlighted]:bg-white/10"><span className="size-4" /> Move to section…</Menu.SubTrigger>
+                  <Menu.SubTrigger className="flex min-h-11 cursor-default items-center gap-2 rounded-xl px-3 outline-none data-[highlighted]:bg-white/10"><span className="size-4" /> {t("Move to section…")}</Menu.SubTrigger>
                   <Menu.Portal>
                     <Menu.SubContent className="z-50 min-w-44 rounded-2xl border border-line bg-surface-2 p-1.5 shadow-lg">
-                      <Item onSelect={() => onMove(card, { sectionId: null })} disabled={card.placement.sectionId === null}>Anytime</Item>
+                      <Item onSelect={() => onMove(card, { sectionId: null })} disabled={card.placement.sectionId === null}>{t("Anytime")}</Item>
                       {sections.map((s) => <Item key={s.id} onSelect={() => onMove(card, { sectionId: s.id })} disabled={card.placement.sectionId === s.id}>{s.name}</Item>)}
                     </Menu.SubContent>
                   </Menu.Portal>
                 </Menu.Sub>
                 <Menu.Separator className="my-1 h-px bg-line" />
                 <Item icon={card.density === "compact" ? <Maximize2 size={16} /> : <Minimize2 size={16} />} onSelect={() => void act((p) => p.setPlacementFlags(inst, { density: card.density === "compact" ? "comfortable" : "compact" }))}>
-                  {card.density === "compact" ? "Show comfortable (just this card)" : "Show compact (just this card)"}
+                  {card.density === "compact" ? t("Show comfortable (just this card)") : t("Show compact (just this card)")}
                 </Item>
-                <Item icon={<EyeOff size={16} />} onSelect={() => void act((p) => p.setPlacementFlags(inst, { hidden: true }), { done: "Hidden from your day", undo: () => useApp.getState().planner!.setPlacementFlags(inst, { hidden: false }) })}>Hide from my day</Item>
+                <Item icon={<EyeOff size={16} />} onSelect={() => void act((p) => p.setPlacementFlags(inst, { hidden: true }), { done: t("Hidden from your day"), undo: () => useApp.getState().planner!.setPlacementFlags(inst, { hidden: false }) })}>{t("Hide from my day")}</Item>
                 {card.canEdit && (
                   <>
                     <Menu.Separator className="my-1 h-px bg-line" />
-                    <Item danger icon={<Trash2 size={16} />} onSelect={() => onDelete(card)}>Delete…</Item>
+                    <Item danger icon={<Trash2 size={16} />} onSelect={() => onDelete(card)}>{t("Delete…")}</Item>
                   </>
                 )}
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
         </div>
-        {help && !derived && <p role="note" className="basis-full rounded-lg bg-surface-2 px-3 py-2 text-[15px] leading-snug text-muted">You mark this card done yourself. The lists and targets above track progress but never complete it.</p>}
+        {help && !derived && <p role="note" className="basis-full rounded-lg bg-surface-2 px-3 py-2 text-[15px] leading-snug text-muted">{t("You mark this card done yourself. The lists and targets above track progress but never complete it.")}</p>}
       </footer>
     </article>
   );
@@ -494,29 +499,30 @@ function Item({ children, icon, onSelect, disabled, danger }: { children: React.
 
 /** A note you can edit in place; structural changes (adding/removing blocks) stay in the editor. */
 function NoteView({ lead, title, text, canEdit, onSave }: { lead?: boolean; title: string; text: string; canEdit: boolean; onSave: (t: string) => Promise<unknown> }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [busy, setBusy] = useState(false);
   return (
     <section>
       <div className="flex items-center justify-between gap-2">
-        <Label>{title || "Notes"}</Label>
+        <Label>{title || t("Notes")}</Label>
         {canEdit && !editing && (
-          <button type="button" onClick={() => { setDraft(text); setEditing(true); }} aria-label={`Edit ${title || "notes"}`} className="-mt-1.5 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm text-muted hover:bg-surface-2 hover:text-fg"><Pencil size={13} aria-hidden /> Edit</button>
+          <button type="button" onClick={() => { setDraft(text); setEditing(true); }} aria-label={t("Edit {title}", { title: title || t("notes") })} className="-mt-1.5 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm text-muted hover:bg-surface-2 hover:text-fg"><Pencil size={13} aria-hidden /> {t("Edit")}</button>
         )}
       </div>
       {editing ? (
         <div className="space-y-2">
-          <textarea autoFocus rows={4} aria-label={title || "Notes"} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setEditing(false)} className={clsx(inputCls, "py-2")} />
+          <textarea autoFocus rows={4} aria-label={title || t("Notes")} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setEditing(false)} className={clsx(inputCls, "py-2")} />
           <div className="flex gap-2">
-            <button type="button" disabled={busy} onClick={async () => { setBusy(true); await onSave(draft); setBusy(false); setEditing(false); }} className="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Save</button>
-            <button type="button" onClick={() => setEditing(false)} className="min-h-11 rounded-xl border border-line px-4">Cancel</button>
+            <button type="button" disabled={busy} onClick={async () => { setBusy(true); await onSave(draft); setBusy(false); setEditing(false); }} className="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">{t("Save")}</button>
+            <button type="button" onClick={() => setEditing(false)} className="min-h-11 rounded-xl border border-line px-4">{t("Cancel")}</button>
           </div>
         </div>
       ) : text.trim() ? (
         <RichText text={text} className={lead ? "text-[17px] text-fg" : undefined} />
       ) : (
-        <p className="text-sm text-muted">Empty note</p>
+        <p className="text-sm text-muted">{t("Empty note")}</p>
       )}
     </section>
   );
@@ -524,6 +530,7 @@ function NoteView({ lead, title, text, canEdit, onSave }: { lead?: boolean; titl
 
 /* ------------------------------------------------------------------ blocks */
 function ChecklistView({ block, card, first, onToggle, onAdd }: { block: ChecklistBlock; card: DayCard; first?: boolean; onToggle: (id: ID, v: boolean) => void; onAdd?: (text: string) => void }) {
+  const t = useT();
   const [adding, setAdding] = useState(false);
   const [text, setText] = useState("");
   const done = block.items.filter((i) => card.state.checks[i.id]).length;
@@ -535,7 +542,7 @@ function ChecklistView({ block, card, first, onToggle, onAdd }: { block: Checkli
   return (
     <section>
       <Label>
-        {block.title || "Checklist"} <span className="ml-1 font-normal normal-case tracking-normal text-muted">{done}/{block.items.length}</span>
+        {block.title || t("Checklist")} <span className="ml-1 font-normal normal-case tracking-normal text-muted">{done}/{block.items.length}</span>
       </Label>
       <ul>
         {block.items.map((it) => {
@@ -562,12 +569,12 @@ function ChecklistView({ block, card, first, onToggle, onAdd }: { block: Checkli
               submit();
             }}
           >
-            <input autoFocus value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setAdding(false)} placeholder="New item" aria-label={`New item for ${block.title}`} className={inputCls} />
-            <button type="submit" className="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">Add</button>
+            <input autoFocus value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setAdding(false)} placeholder={t("New item")} aria-label={t("New item for {title}", { title: block.title })} className={inputCls} />
+            <button type="submit" className="min-h-11 rounded-xl bg-accent px-4 font-semibold text-accent-ink">{t("Add")}</button>
           </form>
         ) : (
           <button type="button" onClick={() => setAdding(true)} className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-xl border border-line px-4 text-[15px] hover:bg-surface-2">
-            <Plus size={16} aria-hidden /> Add {block.noun ? block.noun.replace(/s$/, "") : "item"}
+            <Plus size={16} aria-hidden /> {t("Add {noun}", { noun: block.noun ? block.noun.replace(/s$/, "") : t("item") })}
           </button>
         ))}
     </section>
@@ -575,21 +582,22 @@ function ChecklistView({ block, card, first, onToggle, onAdd }: { block: Checkli
 }
 
 function ProgressView({ block, card, first, onSet }: { block: ProgressBlock; card: DayCard; first?: boolean; onSet: (v: number) => void }) {
+  const t = useT();
   const value = card.state.values[block.id] ?? 0;
   const [draft, setDraft] = useState<string | null>(null);
   const accent = PROGRESS_FILL;
   const complete = blockComplete(block, card.state);
   return (
     <section>
-      <Label>{block.title || "Progress"}</Label>
+      <Label>{block.title || t("Progress")}</Label>
       <div className="flex items-center gap-2">
-        <IconButton label={`Decrease ${block.title} by ${fmtNum(block.step)}`} disabled={!card.canProgress || value <= 0} onClick={() => onSet(value - block.step)}>
+        <IconButton label={t("Decrease {title} by {step}", { title: block.title, step: fmtNum(block.step) })} disabled={!card.canProgress || value <= 0} onClick={() => onSet(value - block.step)}>
           <Minus size={18} />
         </IconButton>
         <div className="flex min-w-0 flex-1 items-center justify-center gap-2 text-lg">
           <input
             {...(first ? { "data-track-first": "" } : {})}
-            aria-label={`${block.title} value`}
+            aria-label={t("{title} value", { title: block.title })}
             inputMode="decimal"
             disabled={!card.canProgress}
             value={draft ?? fmtNum(value)}
@@ -604,31 +612,32 @@ function ProgressView({ block, card, first, onSet }: { block: ProgressBlock; car
             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
             className="w-20 rounded-lg border border-line bg-bg px-2 py-1.5 text-center"
           />
-          <span className="text-muted">of {fmtNum(block.target)} {block.unit}</span>
+          <span className="text-muted">{t("of {target} {unit}", { target: fmtNum(block.target), unit: block.unit })}</span>
         </div>
-        <button type="button" disabled={!card.canProgress} onClick={() => onSet(value + block.step)} aria-label={`Increase ${block.title} by ${fmtNum(block.step)}`} className="inline-flex min-h-11 items-center gap-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink hover:brightness-110 disabled:opacity-40">
+        <button type="button" disabled={!card.canProgress} onClick={() => onSet(value + block.step)} aria-label={t("Increase {title} by {step}", { title: block.title, step: fmtNum(block.step) })} className="inline-flex min-h-11 items-center gap-1 rounded-xl bg-accent px-4 font-semibold text-accent-ink hover:brightness-110 disabled:opacity-40">
           <Plus size={16} aria-hidden /> {fmtNum(block.step)}
         </button>
       </div>
-      <ProgressBar className="mt-2" fraction={blockFraction(block, card.state)} label={`${block.title} progress`} accent={accent} />
-      {complete && <p className="mt-1 text-sm text-muted">Target reached{value > block.target ? ` — ${fmtNum(value)} ${block.unit} so far` : ""}.</p>}
+      <ProgressBar className="mt-2" fraction={blockFraction(block, card.state)} label={t("{title} progress", { title: block.title })} accent={accent} />
+      {complete && <p className="mt-1 text-sm text-muted">{value > block.target ? t("Target reached — {value} {unit} so far.", { value: fmtNum(value), unit: block.unit }) : t("Target reached.")}</p>}
     </section>
   );
 }
 
 function ResponsibilityView({ block, card, ws, nameOf, onAssign }: { block: ResponsibilityBlock; card: DayCard; ws: Workspace; nameOf: (id: ID | null) => string; onAssign: (aid: ID, userId: ID | null) => void }) {
+  const t = useT();
   const members = ws.members.filter((m) => m.groupId === card.instance.groupId);
   const canAssign = card.canEdit && !!card.instance.groupId;
   return (
     <section>
-      <Label>{block.title || "Responsibilities"}</Label>
+      <Label>{block.title || t("Responsibilities")}</Label>
       <ul className="space-y-1">
         {block.assignments.map((a) => (
           <li key={a.id} className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 last:border-0">
             <span>{a.label}</span>
             {canAssign ? (
-              <select aria-label={`Who: ${a.label}`} value={a.userId ?? ""} onChange={(e) => onAssign(a.id, e.target.value || null)} className="min-h-11 rounded-lg border border-line bg-bg px-2 text-[15px]">
-                <option value="">Unassigned</option>
+              <select aria-label={t("Who: {label}", { label: a.label })} value={a.userId ?? ""} onChange={(e) => onAssign(a.id, e.target.value || null)} className="min-h-11 rounded-lg border border-line bg-bg px-2 text-[15px]">
+                <option value="">{t("Unassigned")}</option>
                 {members.map((m) => (
                   <option key={m.userId} value={m.userId}>{nameOf(m.userId)}</option>
                 ))}
@@ -639,7 +648,7 @@ function ResponsibilityView({ block, card, ws, nameOf, onAssign }: { block: Resp
           </li>
         ))}
       </ul>
-      {!card.instance.groupId && <p className="mt-1 text-xs text-muted">Share this card with a group to assign people.</p>}
+      {!card.instance.groupId && <p className="mt-1 text-xs text-muted">{t("Share this card with a group to assign people.")}</p>}
     </section>
   );
 }

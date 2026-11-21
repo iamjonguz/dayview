@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { t } from "../i18n";
 import type { Focus } from "../domain/types";
 
 export const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -11,9 +12,9 @@ export const FOCUS_DEFAULT: Focus = { x: 0.5, y: 0.5, zoom: 1 };
 /** Returns a plain-language problem, or null when the file is acceptable. */
 export function validateImageFile(f: { type: string; size: number }): string | null {
   if (!ACCEPTED_TYPES.includes(f.type))
-    return /heic|heif/i.test(f.type) ? "That looks like an iPhone HEIC photo. Choose it again from Photos (it converts automatically), or export it as JPEG." : "Choose a JPEG, PNG or WebP image.";
-  if (f.size === 0) return "That file is empty.";
-  if (f.size > MAX_INPUT_BYTES) return `That photo is ${(f.size / 1048576).toFixed(0)} MB. Choose one under ${MAX_INPUT_BYTES / 1048576} MB.`;
+    return /heic|heif/i.test(f.type) ? t("That looks like an iPhone HEIC photo. Choose it again from Photos (it converts automatically), or export it as JPEG.") : t("Choose a JPEG, PNG or WebP image.");
+  if (f.size === 0) return t("That file is empty.");
+  if (f.size > MAX_INPUT_BYTES) return t("That photo is {size} MB. Choose one under {max} MB.", { size: (f.size / 1048576).toFixed(0), max: MAX_INPUT_BYTES / 1048576 });
   return null;
 }
 
@@ -46,20 +47,20 @@ export async function prepareImage(file: File, onProgress?: (stage: Stage, pct: 
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => (URL.revokeObjectURL(url), ok(img));
-      img.onerror = () => (URL.revokeObjectURL(url), no(new Error("That file couldn’t be read as an image. Try another photo.")));
+      img.onerror = () => (URL.revokeObjectURL(url), no(new Error(t("That file couldn’t be read as an image. Try another photo."))));
       img.src = url;
     });
   }
   const sw = "naturalWidth" in bmp ? bmp.naturalWidth : bmp.width;
   const sh = "naturalHeight" in bmp ? bmp.naturalHeight : bmp.height;
-  if (!sw || !sh) throw new Error("That image has no readable size.");
+  if (!sw || !sh) throw new Error(t("That image has no readable size."));
   onProgress?.("resizing", 40);
   const { width, height } = fitWithin(sw, sh);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("This browser can’t process images.");
+  if (!ctx) throw new Error(t("This browser can’t process images."));
   ctx.fillStyle = "#252a32"; // flatten transparency onto the card surface
   ctx.fillRect(0, 0, width, height);
   ctx.imageSmoothingQuality = "high";
@@ -70,7 +71,7 @@ export async function prepareImage(file: File, onProgress?: (stage: Stage, pct: 
     blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", q));
     if (blob && blob.size <= MAX_OUTPUT_BYTES) break;
   }
-  if (!blob || blob.size > MAX_OUTPUT_BYTES) throw new Error("That photo is too detailed to shrink enough. Try a smaller one.");
+  if (!blob || blob.size > MAX_OUTPUT_BYTES) throw new Error(t("That photo is too detailed to shrink enough. Try a smaller one."));
   onProgress?.("resizing", 70);
   return blob;
 }

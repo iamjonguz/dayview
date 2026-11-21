@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { Block, CardSpec, ChecklistBlock, ProgressBlock, ProgressState } from "./types";
 
 /**
@@ -52,13 +53,13 @@ export interface CardProgress {
 
 function summarise(blocks: TrackingBlock[], state: ProgressState): { fraction: number; label: string } {
   const fraction = Math.min(1, blocks.reduce((s, b) => s + blockFraction(b, state), 0) / blocks.length);
-  if (blocks.length > 1) return { fraction, label: `${blocks.filter((b) => blockComplete(b, state)).length} of ${blocks.length} parts` };
+  if (blocks.length > 1) return { fraction, label: t("{done} of {total} parts", { done: blocks.filter((b) => blockComplete(b, state)).length, total: blocks.length }) };
   const b = blocks[0];
   if (b.type === "checklist") {
     const done = b.items.filter((i) => state.checks[i.id]).length;
-    return { fraction, label: `${done} of ${b.items.length} ${b.noun || (b.items.length === 1 ? "item" : "items")}` };
+    return { fraction, label: t("{done} of {total} {noun}", { done, total: b.items.length, noun: b.noun || (b.items.length === 1 ? t("item") : t("items")) }) };
   }
-  return { fraction, label: `${fmtNum(state.values[b.id] ?? 0)} of ${fmtNum(b.target)}${b.unit ? ` ${b.unit}` : ""}` };
+  return { fraction, label: t("{done} of {total}", { done: fmtNum(state.values[b.id] ?? 0), total: fmtNum(b.target) }) + (b.unit ? ` ${b.unit}` : "") };
 }
 
 /** Tracking blocks shown in the front summary: the card's own pick when set (and still valid), otherwise the relevant ones. */
@@ -113,11 +114,11 @@ export function resolveSummary(spec: CardSpec, state: ProgressState): string {
   if (!b) return spec.summary;
   if (src.kind === "next-item" && b.type === "checklist") {
     const next = b.items.find((i) => i.text.trim() && !state.checks[i.id]);
-    if (next) return `Next: ${next.text}`;
-    return b.items.length ? `All ${b.noun || "items"} ticked` : spec.summary;
+    if (next) return t("Next: {item}", { item: next.text });
+    return b.items.length ? t("All {noun} ticked", { noun: b.noun || t("items") }) : spec.summary;
   }
   if (src.kind === "note" && b.type === "note") return firstLine(b.text) || spec.summary;
   if (src.kind === "progress" && b.type === "progress")
-    return `${fmtNum(state.values[b.id] ?? 0)} of ${fmtNum(b.target)}${b.unit ? ` ${b.unit}` : ""}`;
+    return t("{done} of {total}", { done: fmtNum(state.values[b.id] ?? 0), total: fmtNum(b.target) }) + (b.unit ? ` ${b.unit}` : "");
   return spec.summary;
 }

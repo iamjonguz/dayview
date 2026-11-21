@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { addDays, formatLong, formatShort } from "@/lib/domain/dates";
+import { useT } from "@/lib/i18n";
 import type { CardInstance } from "@/lib/domain/types";
 import { useApp } from "@/store/app";
 import { useUi } from "@/store/ui";
@@ -11,27 +12,28 @@ import { Button, Field, Sheet, Spinner, inputCls } from "./ui";
 
 /** Move or copy a card to another day. */
 export function RescheduleSheet({ card, mode, onClose }: { card: CardInstance; mode: "move" | "copy"; onClose: () => void }) {
+  const t = useT();
   const act = useApp((s) => s.act);
   const planner = useApp((s) => s.planner)!;
   const [date, setDate] = useState(addDays(card.date, 1));
   const routine = !!card.seriesId && !card.groupId;
   const go = async () => {
-    const r = await act((p) => (mode === "move" ? p.moveCardToDate(card, date) : p.copyCardToDate(card, date)), { done: `${mode === "move" ? "Moved" : "Copied"} to ${formatShort(date)}` });
+    const r = await act((p) => (mode === "move" ? p.moveCardToDate(card, date) : p.copyCardToDate(card, date)), { done: t(mode === "move" ? "Moved to {date}" : "Copied to {date}", { date: formatShort(date) }) });
     if (r.ok) onClose();
   };
   return (
-    <Sheet open onOpenChange={(o) => !o && onClose()} title={mode === "move" ? "Move to another day" : "Copy to another day"} description={`“${card.spec.title}” from ${formatLong(card.date)}`}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!date || date === card.date} onClick={go}>{mode === "move" ? "Move" : "Copy"}</Button></>}>
-      <Field label="Day" htmlFor="rd"><input id="rd" type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+    <Sheet open onOpenChange={(o) => !o && onClose()} title={mode === "move" ? t("Move to another day") : t("Copy to another day")} description={t("“{title}” from {date}", { title: card.spec.title, date: formatLong(card.date) })}
+      footer={<><Button onClick={onClose}>{t("Cancel")}</Button><Button variant="primary" disabled={!date || date === card.date} onClick={go}>{mode === "move" ? t("Move") : t("Copy")}</Button></>}>
+      <Field label={t("Day")} htmlFor="rd"><input id="rd" type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       <div className="mt-3 flex gap-2">
-        {[["Tomorrow", 1], ["In a week", 7]].map(([l, n]) => <Button key={l} small onClick={() => setDate(addDays(planner.today(), Number(n)))}>{l}</Button>)}
+        {([[t("Tomorrow"), 1], [t("In a week"), 7]] as const).map(([l, n]) => <Button key={n} small onClick={() => setDate(addDays(planner.today(), n))}>{l}</Button>)}
       </div>
       <p className="mt-4 text-sm text-muted">
         {mode === "copy"
-          ? "The copy is a separate personal card; progress isn’t copied."
+          ? t("The copy is a separate personal card; progress isn’t copied.")
           : routine
-            ? "This day of the routine will be skipped and a one-off copy created on the new day. The routine itself is unchanged."
-            : card.groupId ? "Shared cards move for everyone in the group." : "Progress stays with the card."}
+            ? t("This day of the routine will be skipped and a one-off copy created on the new day. The routine itself is unchanged.")
+            : card.groupId ? t("Shared cards move for everyone in the group.") : t("Progress stays with the card.")}
       </p>
     </Sheet>
   );
@@ -39,6 +41,7 @@ export function RescheduleSheet({ card, mode, onClose }: { card: CardInstance; m
 
 /** Gentle, opt-in carry-over: unfinished one-off cards from yesterday. Never framed as failure. */
 export function CarryOver() {
+  const t = useT();
   const planner = useApp((s) => s.planner);
   const date = useApp((s) => s.date);
   const dataVersion = useApp((s) => s.data);
@@ -64,14 +67,14 @@ export function CarryOver() {
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-3">
-        <p className="text-[15px]">{items.length} {items.length === 1 ? "thing" : "things"} from yesterday didn’t get done. Want to bring {items.length === 1 ? "it" : "any"} along?</p>
+        <p className="text-[15px]">{items.length === 1 ? t("1 thing from yesterday didn’t get done. Want to bring it along?") : t("{n} things from yesterday didn’t get done. Want to bring any along?", { n: items.length })}</p>
         <span className="flex gap-2">
-          <Button small variant="primary" onClick={() => { setSel(items.map((i) => i.id)); setOpen(true); }}>Review</Button>
-          <Button small variant="ghost" onClick={() => { try { localStorage.setItem(key, "1"); } catch {} setDismissed(true); }}>Not now</Button>
+          <Button small variant="primary" onClick={() => { setSel(items.map((i) => i.id)); setOpen(true); }}>{t("Review")}</Button>
+          <Button small variant="ghost" onClick={() => { try { localStorage.setItem(key, "1"); } catch {} setDismissed(true); }}>{t("Not now")}</Button>
         </span>
       </div>
-      <Sheet open={open} onOpenChange={setOpen} title="From yesterday" description="Choose what to move to today. Anything you leave stays on yesterday."
-        footer={<><Button onClick={() => setOpen(false)}>Close</Button><Button variant="primary" disabled={sel.length === 0} onClick={async () => { const r = await act((p) => p.carryOver(sel, from, today!), { done: `Moved ${sel.length} to today` }); if (r.ok) setOpen(false); }}>Move {sel.length} to today</Button></>}>
+      <Sheet open={open} onOpenChange={setOpen} title={t("From yesterday")} description={t("Choose what to move to today. Anything you leave stays on yesterday.")}
+        footer={<><Button onClick={() => setOpen(false)}>{t("Close")}</Button><Button variant="primary" disabled={sel.length === 0} onClick={async () => { const r = await act((p) => p.carryOver(sel, from, today!), { done: t("Moved {n} to today", { n: sel.length }) }); if (r.ok) setOpen(false); }}>{t("Move {n} to today", { n: sel.length })}</Button></>}>
         <ul className="space-y-1">
           {items.map((i) => (
             <li key={i.id}>
@@ -89,6 +92,7 @@ export function CarryOver() {
 }
 
 export function SearchSheet() {
+  const t = useT();
   const open = useUi((s) => s.searchOpen);
   const setOpen = useUi((s) => s.setSearchOpen);
   const planner = useApp((s) => s.planner);
@@ -100,18 +104,18 @@ export function SearchSheet() {
   useEffect(() => {
     if (!planner || q.trim().length < 2) return;
     let live = true;
-    const t = setTimeout(() => planner.search(q).then((r) => live && (setRes(r), setErr(null)), (e) => live && setErr(String(e?.message ?? e))), 200);
-    return () => { live = false; clearTimeout(t); };
+    const timer = setTimeout(() => planner.search(q).then((r) => live && (setRes(r), setErr(null)), (e) => live && setErr(String(e?.message ?? e))), 200);
+    return () => { live = false; clearTimeout(timer); };
   }, [q, planner]);
 
   return (
-    <Sheet open={open} onOpenChange={setOpen} title="Search" description="Titles, summaries, notes and checklist items, a year either way.">
+    <Sheet open={open} onOpenChange={setOpen} title={t("Search")} description={t("Titles, summaries, notes and checklist items, a year either way.")}>
       <div className="relative">
         <Search size={18} className="pointer-events-none absolute left-3 top-3.5 text-muted" aria-hidden />
-        <input autoFocus type="search" aria-label="Search cards" className={`${inputCls} pl-10`} placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input autoFocus type="search" aria-label={t("Search cards")} className={`${inputCls} pl-10`} placeholder={t("Search…")} value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <div className="mt-4" aria-live="polite">
-        {err ? <p role="alert" className="text-danger">{err}</p> : q.trim().length < 2 ? <p className="text-muted">Type at least two letters.</p> : res === null ? <Spinner /> : res.length === 0 ? <p className="text-muted">No cards match “{q}”.</p> : (
+        {err ? <p role="alert" className="text-danger">{err}</p> : q.trim().length < 2 ? <p className="text-muted">{t("Type at least two letters.")}</p> : res === null ? <Spinner /> : res.length === 0 ? <p className="text-muted">{t("No cards match “{q}”.", { q })}</p> : (
           <ul className="divide-y divide-line">
             {res.map((i) => (
               <li key={i.id}>

@@ -1,3 +1,4 @@
+import { t as tt } from "../i18n";
 /** Core domain model. Dates are plain "YYYY-MM-DD" strings in the user's timezone; times are "HH:MM". */
 
 export type ID = string;
@@ -255,14 +256,14 @@ export interface DayData {
 }
 
 export class ConflictError extends Error {
-  constructor(message = "This item was changed by someone else.") {
-    super(message);
+  constructor(message?: string) {
+    super(message ?? tt("This item was changed by someone else."));
     this.name = "ConflictError";
   }
 }
 export class PermissionError extends Error {
-  constructor(message = "You don't have permission to do that.") {
-    super(message);
+  constructor(message?: string) {
+    super(message ?? tt("You don't have permission to do that."));
     this.name = "PermissionError";
   }
 }

@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { ArrowDown, ArrowUp, ArrowUpDown, Copy, GripVertical, MoreHorizontal, Plus, Trash2, Undo2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { uid } from "@/lib/domain/factory";
+import { useT } from "@/lib/i18n";
 import type { ChecklistBlock, ChecklistItem } from "@/lib/domain/types";
 import { Button, IconButton, inputCls } from "./ui";
 
@@ -16,6 +17,7 @@ import { Button, IconButton, inputCls } from "./ui";
  * Item ids never change, so recorded completion survives reordering, and a removed item can be brought back.
  */
 export function ChecklistEditor({ block, onChange }: { block: ChecklistBlock; onChange: (b: ChecklistBlock) => void }) {
+  const t = useT();
   const [reorder, setReorder] = useState(false);
   const [removed, setRemoved] = useState<{ item: ChecklistItem; index: number } | null>(null);
   const focusAfter = useRef<string | null>(null);
@@ -68,15 +70,15 @@ export function ChecklistEditor({ block, onChange }: { block: ChecklistBlock; on
     if (from >= 0 && to >= 0) setItems(arrayMove(items, from, to));
   };
 
-  const label = (it: ChecklistItem, i: number) => it.text.trim() || `item ${i + 1}`;
+  const label = (it: ChecklistItem, i: number) => it.text.trim() || t("item {n}", { n: i + 1 });
 
   return (
     <div className="space-y-2">
       {items.length > 1 && (
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm text-muted" aria-live="polite">{reorder ? "Drag the handle, or use the arrows." : `${items.length} items`}</p>
+          <p className="text-sm text-muted" aria-live="polite">{reorder ? t("Drag the handle, or use the arrows.") : t("{n} items", { n: items.length })}</p>
           <Button small variant={reorder ? "primary" : "outline"} aria-pressed={reorder} onClick={() => setReorder(!reorder)}>
-            <ArrowUpDown size={14} aria-hidden /> {reorder ? "Done reordering" : "Reorder"}
+            <ArrowUpDown size={14} aria-hidden /> {reorder ? t("Done reordering") : t("Reorder")}
           </Button>
         </div>
       )}
@@ -90,9 +92,9 @@ export function ChecklistEditor({ block, onChange }: { block: ChecklistBlock; on
                   {(handle) => (
                     <>
                       {handle}
-                      <span className="min-w-0 flex-1 truncate text-[15px]">{it.text || <span className="text-muted">Empty item</span>}</span>
-                      <IconButton label={`Move “${label(it, i)}” up`} variant="ghost" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={16} /></IconButton>
-                      <IconButton label={`Move “${label(it, i)}” down`} variant="ghost" disabled={i === items.length - 1} onClick={() => move(i, 1)}><ArrowDown size={16} /></IconButton>
+                      <span className="min-w-0 flex-1 truncate text-[15px]">{it.text || <span className="text-muted">{t("Empty item")}</span>}</span>
+                      <IconButton label={t("Move “{item}” up", { item: label(it, i) })} variant="ghost" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={16} /></IconButton>
+                      <IconButton label={t("Move “{item}” down", { item: label(it, i) })} variant="ghost" disabled={i === items.length - 1} onClick={() => move(i, 1)}><ArrowDown size={16} /></IconButton>
                     </>
                   )}
                 </SortableRow>
@@ -105,7 +107,7 @@ export function ChecklistEditor({ block, onChange }: { block: ChecklistBlock; on
           {items.map((it, i) => (
             <li key={it.id} className="flex items-center gap-1">
               <input
-                aria-label={`Item ${i + 1}`}
+                aria-label={t("Item {n}", { n: i + 1 })}
                 className={clsx(inputCls, "min-w-0 flex-1")}
                 value={it.text}
                 data-item={it.id}
@@ -119,7 +121,7 @@ export function ChecklistEditor({ block, onChange }: { block: ChecklistBlock; on
               />
               <Menu.Root>
                 <Menu.Trigger asChild>
-                  <IconButton label={`More actions for ${label(it, i)}`} variant="ghost" className="text-muted"><MoreHorizontal size={18} /></IconButton>
+                  <IconButton label={t("More actions for {item}", { item: label(it, i) })} variant="ghost" className="text-muted"><MoreHorizontal size={18} /></IconButton>
                 </Menu.Trigger>
                 <Menu.Portal>
                   <Menu.Content
@@ -133,10 +135,10 @@ export function ChecklistEditor({ block, onChange }: { block: ChecklistBlock; on
                     }}
                     className="z-[90] min-w-48 rounded-2xl border border-line bg-surface-2 p-1.5 text-[15px] shadow-lg"
                   >
-                    <Menu.Item onSelect={() => insertAfter(i)} className={menuItem}><Plus size={16} aria-hidden /> Add item below</Menu.Item>
-                    <Menu.Item onSelect={() => insertAfter(i, it.text)} className={menuItem}><Copy size={16} aria-hidden /> Duplicate</Menu.Item>
+                    <Menu.Item onSelect={() => insertAfter(i)} className={menuItem}><Plus size={16} aria-hidden /> {t("Add item below")}</Menu.Item>
+                    <Menu.Item onSelect={() => insertAfter(i, it.text)} className={menuItem}><Copy size={16} aria-hidden /> {t("Duplicate")}</Menu.Item>
                     <Menu.Separator className="my-1 h-px bg-line" />
-                    <Menu.Item onSelect={() => remove(i)} className={clsx(menuItem, "text-danger")}><Trash2 size={16} aria-hidden /> Remove</Menu.Item>
+                    <Menu.Item onSelect={() => remove(i)} className={clsx(menuItem, "text-danger")}><Trash2 size={16} aria-hidden /> {t("Remove")}</Menu.Item>
                   </Menu.Content>
                 </Menu.Portal>
               </Menu.Root>
@@ -147,18 +149,18 @@ export function ChecklistEditor({ block, onChange }: { block: ChecklistBlock; on
 
       {removed && (
         <p role="status" className="flex items-center gap-2 rounded-lg bg-surface-2 py-1 pl-3 pr-1 text-[15px]">
-          <span className="min-w-0 flex-1 truncate">Removed “{removed.item.text || "empty item"}”</span>
-          <button type="button" onClick={undo} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 font-semibold text-accent hover:bg-white/10"><Undo2 size={15} aria-hidden /> Undo</button>
-          <IconButton label="Dismiss" variant="ghost" onClick={() => setRemoved(null)}><X size={16} /></IconButton>
+          <span className="min-w-0 flex-1 truncate">{t("Removed “{item}”", { item: removed.item.text || t("empty item") })}</span>
+          <button type="button" onClick={undo} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 font-semibold text-accent hover:bg-white/10"><Undo2 size={15} aria-hidden /> {t("Undo")}</button>
+          <IconButton label={t("Dismiss")} variant="ghost" onClick={() => setRemoved(null)}><X size={16} /></IconButton>
         </p>
       )}
 
       {!reorder && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button small variant="soft" onClick={() => insertAfter(items.length - 1)}><Plus size={14} aria-hidden /> Add item</Button>
+          <Button small variant="soft" onClick={() => insertAfter(items.length - 1)}><Plus size={14} aria-hidden /> {t("Add item")}</Button>
           <label className="ml-auto flex items-center gap-2 text-sm text-muted">
-            Called
-            <input aria-label="What items are called (plural)" className={clsx(inputCls, "w-28 text-sm")} value={block.noun ?? ""} placeholder="items" onChange={(e) => onChange({ ...block, noun: e.target.value || undefined })} />
+            {t("Called")}
+            <input aria-label={t("What items are called (plural)")} className={clsx(inputCls, "w-28 text-sm")} value={block.noun ?? ""} placeholder={t("items")} onChange={(e) => onChange({ ...block, noun: e.target.value || undefined })} />
           </label>
         </div>
       )}
@@ -169,9 +171,10 @@ export function ChecklistEditor({ block, onChange }: { block: ChecklistBlock; on
 const menuItem = "flex min-h-11 cursor-default items-center gap-2 rounded-xl px-3 outline-none data-[highlighted]:bg-white/10";
 
 function SortableRow({ id, children }: { id: string; children: (handle: React.ReactNode) => React.ReactNode }) {
+  const t = useT();
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
   const handle = (
-    <button ref={setActivatorNodeRef} type="button" aria-label="Drag to reorder (or press Space, then the arrow keys)" {...attributes} {...listeners} className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-xl text-muted hover:bg-white/10 active:cursor-grabbing">
+    <button ref={setActivatorNodeRef} type="button" aria-label={t("Drag to reorder (or press Space, then the arrow keys)")} {...attributes} {...listeners} className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-xl text-muted hover:bg-white/10 active:cursor-grabbing">
       <GripVertical size={18} aria-hidden />
     </button>
   );

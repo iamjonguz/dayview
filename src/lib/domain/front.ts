@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { CardSpec, ID, Member, Profile, Workspace } from "./types";
 
 const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
@@ -53,9 +54,9 @@ export function peopleLine(
   const pick = spec.front.personAssignmentId;
   const a = pick ? spec.blocks.flatMap((b) => (b.type === "responsibility" ? b.assignments : [])).find((x) => x.id === pick) : undefined;
   if (!a) return { group: group.name, text: group.name };
-  const duty = a.label.trim().toLowerCase() || "responsible";
+  const duty = a.label.trim().toLowerCase() || t("responsible");
   const member = a.userId ? ctx.members.find((m) => m.groupId === groupId && m.userId === a.userId) : undefined;
   const profile = member ? ctx.profiles.find((p) => p.id === member.userId) : undefined;
-  if (!profile) return { group: group.name, duty, text: `${group.name} · ${duty} unassigned` };
+  if (!profile) return { group: group.name, duty, text: `${group.name} · ${t("{duty} unassigned", { duty })}` };
   return { group: group.name, duty, person: { name: profile.name, initials: initialsOf(profile.name) }, text: `${group.name} · ${profile.name} ${duty}` };
 }

@@ -1,4 +1,5 @@
-import { addDays, compareDates, weekdayOf } from "./dates";
+import { t } from "../i18n";
+import { addDays, compareDates, weekdayOf, weekdayShort } from "./dates";
 import type { DateStr, Recurrence } from "./types";
 
 /** Does the rule produce an occurrence on this calendar date? Pure and timezone-independent. */
@@ -23,15 +24,14 @@ export function occurrencesBetween(rule: Recurrence, from: DateStr, to: DateStr)
 }
 
 export function describeRule(rule: Recurrence): string {
-  const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const days = [...rule.weekdays].sort();
   const key = days.join(",");
   let base: string;
-  if (rule.kind === "daily") base = "Every day";
-  else if (key === "1,2,3,4,5") base = "Weekdays";
-  else if (key === "0,6") base = "Weekends";
-  else base = days.map((d) => names[d]).join(", ") || "No days selected";
-  return rule.end ? `${base} until ${rule.end}` : base;
+  if (rule.kind === "daily") base = t("Every day");
+  else if (key === "1,2,3,4,5") base = t("Weekdays");
+  else if (key === "0,6") base = t("Weekends");
+  else base = days.map((d) => weekdayShort(d)).join(", ") || t("No days selected");
+  return rule.end ? t("{base} until {date}", { base, date: rule.end }) : base;
 }
 
 export const instanceKey = (seriesId: string, date: DateStr) => `${seriesId}@${date}`;

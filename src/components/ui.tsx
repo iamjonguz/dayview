@@ -4,6 +4,7 @@ import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import clsx from "clsx";
 import { X } from "lucide-react";
 import { forwardRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useT } from "@/lib/i18n";
 import { useApp } from "@/store/app";
 
 type Variant = "primary" | "outline" | "ghost" | "danger" | "soft";
@@ -90,6 +91,7 @@ export function Sheet({
   /** Full-screen on phones (editors). */
   full?: boolean;
 }) {
+  const t = useT();
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -109,7 +111,7 @@ export function Sheet({
               {description ? <Dialog.Description className="mt-1 text-sm text-muted">{description}</Dialog.Description> : <Dialog.Description className="sr-only">{title}</Dialog.Description>}
             </div>
             <Dialog.Close asChild>
-              <IconButton label="Close" variant="ghost" className="-mr-2 -mt-1">
+              <IconButton label={t("Close")} variant="ghost" className="-mr-2 -mt-1">
                 <X size={20} />
               </IconButton>
             </Dialog.Close>
@@ -128,7 +130,7 @@ export function Confirm({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Delete",
+  confirmLabel,
   onConfirm,
   children,
 }: {
@@ -141,6 +143,7 @@ export function Confirm({
   children?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
+  const t = useT();
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialog.Portal>
@@ -153,7 +156,7 @@ export function Confirm({
           {children}
           <div className="mt-6 flex justify-end gap-2">
             <AlertDialog.Cancel asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline">{t("Cancel")}</Button>
             </AlertDialog.Cancel>
             <Button
               variant="danger"
@@ -168,7 +171,7 @@ export function Confirm({
                 }
               }}
             >
-              {confirmLabel}
+              {confirmLabel ?? t("Delete")}
             </Button>
           </div>
         </AlertDialog.Content>
@@ -180,30 +183,31 @@ export function Confirm({
 export function Toasts() {
   const toasts = useApp((s) => s.toasts);
   const dismiss = useApp((s) => s.dismissToast);
+  const t = useT();
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--nav-h)+env(safe-area-inset-bottom,0px)+0.75rem)] z-[80] flex flex-col items-center gap-2 px-4 md:bottom-6" role="region" aria-label="Notifications">
-      {toasts.map((t) => (
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--nav-h)+env(safe-area-inset-bottom,0px)+0.75rem)] z-[80] flex flex-col items-center gap-2 px-4 md:bottom-6" role="region" aria-label={t("Notifications")}>
+      {toasts.map((ts) => (
         <div
-          key={t.id}
-          role={t.kind === "error" ? "alert" : "status"}
+          key={ts.id}
+          role={ts.kind === "error" ? "alert" : "status"}
           className={clsx(
             "toast-in pointer-events-auto flex max-w-md items-center gap-3 rounded-xl border px-4 py-3 text-[15px] ",
-            t.kind === "error" ? "border-danger/60 bg-surface-2 text-fg" : "border-line bg-surface-2 text-fg",
+            ts.kind === "error" ? "border-danger/60 bg-surface-2 text-fg" : "border-line bg-surface-2 text-fg",
           )}
         >
-          <span className="flex-1">{t.message}</span>
-          {t.action && (
+          <span className="flex-1">{ts.message}</span>
+          {ts.action && (
             <button
               className="rounded-lg px-2 py-1 font-semibold text-accent hover:bg-white/10"
               onClick={async () => {
-                dismiss(t.id);
-                await t.action!.run();
+                dismiss(ts.id);
+                await ts.action!.run();
               }}
             >
-              {t.action.label}
+              {ts.action.label}
             </button>
           )}
-          <button aria-label="Dismiss" className="rounded-lg p-1 text-muted hover:bg-white/10" onClick={() => dismiss(t.id)}>
+          <button aria-label={t("Dismiss")} className="rounded-lg p-1 text-muted hover:bg-white/10" onClick={() => dismiss(ts.id)}>
             <X size={16} />
           </button>
         </div>
@@ -231,4 +235,7 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
   );
 }
 
-export const Spinner = () => <div className="size-5 animate-spin rounded-full border-2 border-line border-t-accent" role="status" aria-label="Loading" />;
+export function Spinner() {
+  const t = useT();
+  return <div className="size-5 animate-spin rounded-full border-2 border-line border-t-accent" role="status" aria-label={t("Loading")} />;
+}
