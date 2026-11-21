@@ -7,8 +7,8 @@ A calm, mobile-first planner built from customizable activity cards. Next.js 16 
 ```bash
 npm install
 npm run dev        # http://localhost:3000 — demo mode, no setup needed
-npm test           # recurrence, progress, history, sharing + real RLS tests
-npm run lint && npx tsc --noEmit && npm run build
+npm test           # recurrence, progress, history, sharing, i18n + real RLS tests
+npm run lint && npm run typecheck && npm test && npm run build
 ```
 
 ## Demo mode (default)
@@ -49,7 +49,7 @@ Cards can use your own photo (Appearance → Upload a photo → frame it → Use
 
 ## What was verified
 
-- `npm test`: 50 tests — recurrence/DST/timezone, no duplicate instances (concurrent loads), skip, progress rules (notes-only never complete, clamp at 100%), historical isolation, shared vs individual completion, independent personal ordering/hiding, stale-edit detection, invitations, and **the real SQL migration run in an in-process Postgres (PGlite) with RLS exercised as owner/editor/viewer/outsider/anonymous**.
+- `npm test`: 111 tests — recurrence/DST/timezone, no duplicate instances (concurrent loads), skip, progress rules (notes-only never complete, clamp at 100%), historical isolation, shared vs individual completion, independent personal ordering/hiding, stale-edit detection, invitations, and **the real SQL migration run in an in-process Postgres (PGlite) with RLS exercised as owner/editor/viewer/outsider/anonymous**.
 - Manually in a browser: phone-width (390px) and desktop layouts, complete / flip / add / persistence after reload, single card face in the DOM with focus moved to the new control.
 
 ## Design system
