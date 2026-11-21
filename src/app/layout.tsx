@@ -10,6 +10,8 @@ const body = Figtree({ variable: "--font-body", subsets: ["latin"], display: "sw
 export const metadata: Metadata = {
   title: `${BRAND.name} — ${BRAND.tagline.replace(/\.$/, "").toLowerCase()}`,
   description: BRAND.description,
+  applicationName: BRAND.name,
+  appleWebApp: { capable: true, title: BRAND.name, statusBarStyle: "black" },
 };
 export const viewport: Viewport = { themeColor: "#121416", width: "device-width", initialScale: 1, interactiveWidget: "resizes-content" };
 
